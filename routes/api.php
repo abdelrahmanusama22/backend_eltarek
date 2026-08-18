@@ -22,7 +22,7 @@ Route::prefix('v1')->group(function () {
         Route::post('verify-otp', [AuthController::class, 'verifyOtp'])->middleware('throttle:20,1');
         Route::post('social', [AuthController::class, 'social']);
         Route::middleware('auth:sanctum')->group(function () {
-            Route::post('complete-profile', [AuthController::class, 'completeProfile']);
+            Route::post('complete-profile', [AuthController::class, 'completeProfile'])->middleware('throttle:10,1');
             Route::post('logout', [AuthController::class, 'logout']);
         });
     });
