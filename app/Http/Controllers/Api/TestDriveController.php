@@ -101,11 +101,9 @@ class TestDriveController extends ApiController
     }
 
     /** DELETE /test-drives/{booking} */
-    public function destroy(Request $request, Booking $booking): JsonResponse
+    public function destroy(Request $request, $bookingId): JsonResponse
     {
-        if ($booking->user_id !== $request->user()->id) {
-            return $this->fail('Booking not found or already cancelled.', 404);
-        }
+        $booking = $request->user()->bookings()->findOrFail($bookingId);
         if ($booking->status !== 'confirmed') {
             return $this->fail('Booking not found or already cancelled.', 404);
         }
