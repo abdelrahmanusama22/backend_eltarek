@@ -1,0 +1,34 @@
+<?php
+
+namespace App\Models;
+
+use Illuminate\Database\Eloquent\Model;
+
+class GarageCar extends Model
+{
+    public $timestamps = false;
+
+    protected $guarded = [];
+
+    protected $casts = [
+        'warranty_active' => 'boolean',
+        'vip_service' => 'boolean',
+        'warranty_expires_at' => 'date',
+        'next_service_at' => 'date',
+    ];
+
+    public function toApi(): array
+    {
+        return [
+            'id' => $this->id,
+            'tracking_code' => $this->tracking_code,
+            'vehicle' => ['name' => $this->name, 'image_url' => $this->image_url],
+            'warranty_status' => $this->warranty_active ? 'active' : 'expired',
+            'warranty_expires_at' => $this->warranty_expires_at?->toDateString(),
+            'next_service_in_days' => $this->next_service_at
+                ? max(0, (int) now()->startOfDay()->diffInDays($this->next_service_at, false))
+                : null,
+            'vip_service' => $this->vip_service,
+        ];
+    }
+}
