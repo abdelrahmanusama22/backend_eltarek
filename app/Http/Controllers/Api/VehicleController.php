@@ -9,7 +9,7 @@ use Illuminate\Http\Request;
 
 class VehicleController extends ApiController
 {
-    /** GET /vehicles — filtered, paginated catalog. */
+    /** GET /vehicles ??? filtered, paginated catalog. */
     public function index(Request $request): JsonResponse
     {
         $request->validate([
@@ -86,7 +86,7 @@ class VehicleController extends ApiController
             'model' => $vehicle->model,
             'model_ar' => $vehicle->model_ar,
             'year' => $vehicle->year,
-            'hero_image_url' => $vehicle->image_url,
+            'hero_image_url' => $vehicle->resolved_image_url,
             'base_price_egp' => $vehicle->starting_price_egp,
             'trims' => $vehicle->trims->map->toApi(),
         ]);
@@ -101,7 +101,7 @@ class VehicleController extends ApiController
             ? Trim::with('vehicle')->find($trim->suggested_comparison_trim_id)
             : null;
 
-        // "BMW X5 M50i" + trim "M50i" → keep "BMW X5 M50i", not "… M50i M50i".
+        // "BMW X5 M50i" + trim "M50i" ??? keep "BMW X5 M50i", not "??? M50i M50i".
         $displayName = str_ends_with($vehicle->model, $trim->name)
             ? $vehicle->model
             : trim("{$vehicle->model} {$trim->name}");

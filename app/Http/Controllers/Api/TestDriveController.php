@@ -26,7 +26,7 @@ class TestDriveController extends ApiController
             'name' => $t->vehicle->model,
             'name_ar' => $t->vehicle->model_ar,
             'subtitle' => $t->subtitle,
-            'image_url' => $t->vehicle->image_url,
+            'image_url' => $t->vehicle->resolved_image_url,
         ]));
     }
 
@@ -88,9 +88,9 @@ class TestDriveController extends ApiController
             'user_id' => $user->id,
             'type' => 'booking_reminder',
             'title' => 'Test drive confirmed',
-            'title_ar' => 'تم تأكيد تجربة القيادة',
-            'body' => "Reference {$booking->reference} — our team will contact you shortly.",
-            'body_ar' => "رقم الحجز {$booking->reference} — سيتواصل معك فريقنا قريباً.",
+            'title_ar' => '???? ?????????? ?????????? ??????????????',
+            'body' => "Reference {$booking->reference} ??? our team will contact you shortly.",
+            'body_ar' => "?????? ?????????? {$booking->reference} ??? ?????????????? ?????? ???????????? ????????????.",
         ]);
 
         return $this->ok(

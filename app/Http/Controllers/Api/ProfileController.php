@@ -57,7 +57,7 @@ class ProfileController extends ApiController
                 'name' => $trim->vehicle->model,
                 'name_ar' => $trim->vehicle->model_ar,
                 'price_egp' => $trim->price_egp,
-                'image_url' => $trim->vehicle->image_url,
+                'image_url' => $trim->vehicle->resolved_image_url,
             ]),
         );
     }

@@ -11,6 +11,11 @@ class Booking extends Model
 
     protected $casts = ['date' => 'date'];
 
+    public function user(): BelongsTo
+    {
+        return $this->belongsTo(User::class);
+    }
+
     public function trim(): BelongsTo
     {
         return $this->belongsTo(Trim::class);

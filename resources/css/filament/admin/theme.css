@@ -1,0 +1,244 @@
+@import '../../../../vendor/filament/filament/resources/css/theme.css';
+
+@source '../../../../app/Filament/**/*';
+@source '../../../../resources/views/filament/**/*';
+
+@theme {
+    --color-gray-50: #fafafa;
+    --color-gray-100: #f4f4f5;
+    --color-gray-200: #e4e4e7;
+    --color-gray-300: #d4d4d8;
+    --color-gray-400: #a1a1aa;
+    --color-gray-500: #71717a;
+    --color-gray-600: #52525b;
+    --color-gray-700: #3f3f46;
+    --color-gray-800: #27272a;
+    --color-gray-900: #18181b;
+    --color-gray-950: #121216;
+
+    --color-primary-50: #fef2f2;
+    --color-primary-100: #fee2e2;
+    --color-primary-200: #fecaca;
+    --color-primary-300: #fca5a5;
+    --color-primary-400: #f87171;
+    --color-primary-500: #ef4444;
+    --color-primary-600: #e01b22;
+    --color-primary-700: #b91c1c;
+    --color-primary-800: #991b1b;
+    --color-primary-900: #7f1d1d;
+    --color-primary-950: #450a0a;
+}
+
+/* Base modifications for the Premium UI */
+body {
+    background-color: var(--color-gray-950) !important;
+}
+
+.fi-sidebar {
+    background-color: var(--color-gray-950) !important;
+    border-right: 1px solid rgba(255, 255, 255, 0.05) !important;
+}
+
+.fi-sidebar-item-active > a {
+    background-color: rgba(255, 255, 255, 0.03) !important;
+    border-left: 3px solid var(--color-primary-600) !important;
+    border-radius: 0 !important;
+}
+
+.fi-topbar {
+    background-color: var(--color-gray-950) !important;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05) !important;
+}
+
+/* Make cards minimal */
+.fi-ta-content, .fi-wi-stats-overview-card, .fi-wi-chart, .fi-wi-table {
+    background-color: var(--color-gray-900) !important;
+    border: 1px solid rgba(255, 255, 255, 0.05) !important;
+    border-radius: 8px !important;
+    box-shadow: none !important;
+}
+
+/* Remove table row borders */
+.fi-ta-table tbody tr {
+    border-bottom: 1px solid rgba(255, 255, 255, 0.02) !important;
+}
+
+/* Custom search bar in topbar */
+.custom-search-input {
+    background-color: rgba(255, 255, 255, 0.03) !important;
+    border: 1px solid rgba(255, 255, 255, 0.05) !important;
+    border-radius: 6px !important;
+    color: var(--color-gray-200) !important;
+}
+
+/* Stats Overview Text Overrides */
+.fi-transparent-stat .fi-wi-stats-overview-stat-value {
+    font-size: 2.5rem !important;
+    font-weight: 700 !important;
+    letter-spacing: -0.02em;
+}
+.fi-transparent-stat .fi-wi-stats-overview-stat-label {
+    color: var(--color-gray-400) !important;
+    font-size: 0.875rem !important;
+}
+
+/* Ensure Stats Overview has absolutely no background, borders, or rings */
+.fi-transparent-stat,
+.fi-transparent-stat > div,
+.fi-transparent-stat > section {
+    background: transparent !important;
+    background-color: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+    padding: 0 !important;
+}
+/* Disable the Filament default rings */
+.fi-transparent-stat::before,
+.fi-transparent-stat::after,
+.fi-transparent-stat > div::before,
+.fi-transparent-stat > div::after {
+    display: none !important;
+}
+
+/* Remove topbar border to merge with background */
+.fi-topbar {
+    border-bottom: none !important;
+}
+
+/* Fix global search input styling */
+.custom-search-container input {
+    background-color: var(--color-gray-900) !important;
+    border: 1px solid rgba(255, 255, 255, 0.05) !important;
+    border-radius: 8px !important;
+    color: var(--color-gray-200) !important;
+    padding-left: 2.5rem !important;
+}
+.custom-search-container {
+    max-width: 32rem !important; /* wider search bar */
+}
+
+/* Sidebar Logo Subtitle Fix */
+.fi-sidebar-header {
+    flex-direction: column !important;
+    align-items: flex-start !important;
+    padding-top: 1.5rem !important;
+    padding-bottom: 1.5rem !important;
+}
+.fi-sidebar-header .logo-subtitle {
+    font-size: 0.75rem !important;
+    color: var(--color-gray-400) !important;
+    margin-top: 0.25rem !important;
+}
+
+/* Ensure all widget sections get the dark card style */
+.fi-section {
+    background-color: var(--color-gray-900) !important;
+    border: 1px solid rgba(255, 255, 255, 0.05) !important;
+    border-radius: 8px !important;
+    box-shadow: none !important;
+}
+
+/* Ensure Latest Bookings table is perfectly clean */
+.fi-ta-table th, .fi-ta-table td, .fi-ta-table thead, .fi-ta-table tbody {
+    border: none !important;
+}
+.fi-ta-table tbody tr {
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05) !important;
+}
+.fi-ta-table tbody tr:last-child {
+    border-bottom: none !important;
+}
+
+/* Custom UI Colors matching the provided HTML mockup */
+@theme {
+    --color-gray-50: #fafafa;
+    --color-gray-100: #f4f4f5;
+    --color-gray-200: #e4e1e7;
+    --color-gray-300: #d4d4d8;
+    --color-gray-400: #94949E; /* text-secondary */
+    --color-gray-500: #71717a;
+    --color-gray-600: #52525b;
+    --color-gray-700: #353439; /* surface-variant */
+    --color-gray-800: #2A2A30; /* border-subtle */
+    --color-gray-900: #1A1A20; /* Card bg */
+    --color-gray-950: #121216; /* background */
+
+    --color-success-400: #10B981;
+    --color-success-500: #10B981;
+    --color-success-600: #10B981;
+}
+
+body {
+    background-color: var(--color-gray-950) !important;
+    font-family: "Inter", sans-serif !important;
+}
+
+h1, h2, h3, h4, h5, h6, .fi-header-heading {
+    font-family: "Hanken Grotesk", sans-serif !important;
+}
+
+.fi-sidebar {
+    background-color: var(--color-gray-950) !important;
+    border-right: 1px solid var(--color-gray-800) !important;
+}
+
+.fi-topbar {
+    background-color: var(--color-gray-950) !important;
+    border-bottom: none !important;
+}
+
+.fi-ta-content, .fi-wi-stats-overview-card, .fi-wi-chart, .fi-wi-table, .fi-section, .fi-wi-widget {
+    background-color: var(--color-gray-900) !important;
+    border: 1px solid var(--color-gray-800) !important;
+    border-radius: 8px !important;
+    box-shadow: none !important;
+}
+
+/* Fix StatsOverview spacing to match HTML exactly */
+.fi-transparent-stat {
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+    padding: 0 !important;
+}
+
+.fi-transparent-stat .fi-wi-stats-overview-stat-label {
+    color: var(--color-gray-400) !important;
+    font-size: 0.875rem !important;
+    margin-bottom: 0.25rem !important;
+}
+
+.fi-transparent-stat .fi-wi-stats-overview-stat-value {
+    font-size: 2.5rem !important;
+    line-height: 1 !important;
+    font-family: "Hanken Grotesk", sans-serif !important;
+    letter-spacing: -0.02em !important;
+}
+
+/* Remove internal borders of section */
+.fi-section-header {
+    border-bottom: none !important;
+}
+
+/* Font Families */
+.font-inter {
+    font-family: "Inter", sans-serif !important;
+}
+.font-hanken {
+    font-family: "Hanken Grotesk", sans-serif !important;
+}
+
+/* Custom UI Colors matching the provided HTML mockup */
+@theme {
+    --color-danger-400: #e01b22;
+    --color-danger-500: #e01b22;
+    --color-danger-600: #e01b22;
+}
+
+/* Make table backgrounds transparent */
+.fi-ta-table th, .fi-ta-table td, .fi-ta-table thead, .fi-ta-table tbody, .fi-ta-table tr {
+    background-color: transparent !important;
+}
+.fi-ta-table tr:hover {
+    background-color: rgba(255, 255, 255, 0.02) !important;
+}
