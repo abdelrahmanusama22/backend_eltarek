@@ -17,13 +17,13 @@ class OtpLogsTable
             ->columns([
                 TextColumn::make('phone')
                     ->searchable(),
-                TextColumn::make('otp')
-                    ->searchable(),
                 TextColumn::make('expires_at')
                     ->dateTime()
                     ->sortable(),
-                IconColumn::make('is_used')
-                    ->boolean(),
+                IconColumn::make('is_verified')
+                    ->label('Is Verified')
+                    ->boolean()
+                    ->state(fn ($record) => $record->verified_at !== null),
                 TextColumn::make('created_at')
                     ->dateTime()
                     ->sortable()

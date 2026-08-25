@@ -2,11 +2,9 @@
 
 namespace App\Filament\Resources\Users\Schemas;
 
-use Filament\Forms\Components\DatePicker;
-use Filament\Forms\Components\DateTimePicker;
-use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
+use Filament\Forms\Components\Select;
 use Filament\Schemas\Schema;
 
 class UserForm
@@ -17,38 +15,30 @@ class UserForm
             ->components([
                 TextInput::make('name')
                     ->default(null),
-                TextInput::make('email')
-                    ->label('Email address')
-                    ->email()
-                    ->default(null),
-                Toggle::make('is_admin')
-                    ->required(),
                 TextInput::make('phone')
                     ->tel()
-                    ->default(null),
-                DateTimePicker::make('email_verified_at'),
+                    ->required(),
+                Toggle::make('is_admin')
+                    ->label('Is Admin?')
+                    ->live()
+                    ->required(),
+                TextInput::make('email')
+                    ->email()
+                    ->unique(ignoreRecord: true)
+                    ->required(fn ($get): bool => $get('is_admin') === true)
+                    ->visible(fn ($get): bool => $get('is_admin') === true),
                 TextInput::make('password')
                     ->password()
-                    ->default(null),
-                TextInput::make('age')
-                    ->numeric()
-                    ->default(null),
-                Select::make('city_id')
-                    ->relationship('city', 'name')
-                    ->default(null),
-                TextInput::make('vip_tier')
-                    ->required()
-                    ->default('silver'),
-                TextInput::make('vip_points')
-                    ->required()
-                    ->numeric()
-                    ->default(0),
-                DatePicker::make('member_since'),
-                Toggle::make('profile_complete')
-                    ->required(),
-                TextInput::make('avatar_url')
-                    ->url()
-                    ->default(null),
+                    ->required(fn (string $operation, $get): bool => $operation === 'create' && $get('is_admin') === true)
+                    ->visible(fn ($get): bool => $get('is_admin') === true)
+                    ->dehydrated(fn (?string $state) => filled($state))
+                    ->maxLength(255),
+                Select::make('roles')
+                    ->relationship('roles', 'name')
+                    ->multiple()
+                    ->preload()
+                    ->searchable()
+                    ->visible(fn ($get): bool => $get('is_admin') === true),
             ]);
     }
 }

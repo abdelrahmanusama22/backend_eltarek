@@ -1,4 +1,4 @@
-﻿<x-filament-panels::page>
+<x-filament-panels::page>
 {{-- ELTAREK ADMIN — PREMIUM DASHBOARD v2 --}}
 
 <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
@@ -15,36 +15,31 @@ tailwind.config = {
 </script>
 
 @php
-use App\Models\Booking;
-use App\Models\User;
-use App\Models\Vehicle;
-use App\Models\Brand;
-use App\Models\Trim;
 
-$todayBookings   = Booking::whereDate('created_at', today())->count();
-$totalCustomers  = User::where('is_admin', false)->count();
-$activeVehicles  = Vehicle::where('active', true)->count();
-$pendingBookings = Booking::where('status', 'pending')->count();
-$totalBrands     = Brand::count();
-$confirmedCount  = Booking::where('status','confirmed')->count();
-$vipCount        = User::whereIn('vip_tier',['platinum','gold'])->count();
+$todayBookings   = \App\Models\Booking::whereDate('created_at', today())->count();
+$totalCustomers  = \App\Models\User::where('is_admin', false)->count();
+$activeVehicles  = \App\Models\Vehicle::where('active', true)->count();
+$pendingBookings = \App\Models\Booking::where('status', 'pending')->count();
+$totalBrands     = \App\Models\Brand::count();
+$confirmedCount  = \App\Models\Booking::where('status','confirmed')->count();
+$vipCount        = \App\Models\User::whereIn('vip_tier',['platinum','gold'])->count();
 
-$thisM = Booking::whereMonth('created_at', now()->month)->count();
-$lastM = Booking::whereMonth('created_at', now()->subMonth()->month)->count();
+$thisM = \App\Models\Booking::whereMonth('created_at', now()->month)->count();
+$lastM = \App\Models\Booking::whereMonth('created_at', now()->subMonth()->month)->count();
 $growth = $lastM > 0 ? round((($thisM - $lastM) / $lastM) * 100, 1) : 0;
 
 $chartData = collect(range(13, 0))->map(function($d) {
     $date = now()->subDays($d);
     return [
         'label'     => $date->format('M d'),
-        'confirmed' => Booking::whereDate('created_at', $date)->where('status','confirmed')->count(),
-        'pending'   => Booking::whereDate('created_at', $date)->where('status','pending')->count(),
+        'confirmed' => \App\Models\Booking::whereDate('created_at', $date)->where('status','confirmed')->count(),
+        'pending'   => \App\Models\Booking::whereDate('created_at', $date)->where('status','pending')->count(),
     ];
 });
 
-$recentBookings = Booking::with(['user','trim.vehicle','branch'])->latest()->limit(8)->get();
+$recentBookings = \App\Models\Booking::with(['user','trim.vehicle','branch'])->latest()->limit(8)->get();
 
-$fleetTrims = Trim::where('in_test_drive_fleet', true)
+$fleetTrims = \App\Models\Trim::where('in_test_drive_fleet', true)
     ->where('active', true)
     ->with(['vehicle.brand'])
     ->orderBy('fleet_sort')
