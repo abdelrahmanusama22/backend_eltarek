@@ -32,13 +32,45 @@ class TrimForm
                             ->required()
                             ->maxLength(255),
                         TextInput::make('price_egp')
-                            ->label('Price in EGP (السعر بالجنيه)')
+                            ->label('Official Price in EGP (السعر الرسمي بالجنيه)')
                             ->numeric()
                             ->default(null),
-                        TextInput::make('original_price_egp')
-                            ->label('Original Price EGP (السعر الأصلي)')
+                        TextInput::make('markup_percentage')
+                            ->label('Markup Percentage (%)')
+                            ->numeric()
+                            ->default(5)
+                            ->suffix('%')
+                            ->helperText('Executive Price will be calculated automatically based on this %'),
+                        \Filament\Forms\Components\Placeholder::make('executive_price_display')
+                            ->label('Executive Price (Calculated)')
+                            ->content(fn ($record) => $record ? number_format($record->executive_price) . ' EGP' : '-'),
+                        TextInput::make('total_price')
+                            ->label('Total Price (إجمالى السعر)')
                             ->numeric()
                             ->default(null),
+                        TextInput::make('booking_deposit')
+                            ->label('Booking Deposit (مقدم الحجز)')
+                            ->numeric()
+                            ->default(null),
+                        TextInput::make('zero_interest_price')
+                            ->label('Zero Interest Price (عرض زيرو فائدة)')
+                            ->numeric()
+                            ->default(null),
+                        TextInput::make('price_9pct')
+                            ->label('Installment Price 9% (سعر تقسيط 9%)')
+                            ->numeric()
+                            ->default(null),
+                        TextInput::make('colors')
+                            ->label('Available Colors (الألوان المتاحة)')
+                            ->maxLength(255)
+                            ->default(null),
+                        \Filament\Forms\Components\Textarea::make('financing_notes')
+                            ->label('Financing Notes (معلومات اضافية)')
+                            ->rows(2)
+                            ->default(null),
+                        Toggle::make('is_on_hold')
+                            ->label('Hold Status (موقوف/HOLD)')
+                            ->default(false),
                         TextInput::make('subtitle')
                             ->label('Subtitle / Engine (المحرك / تفاصيل)')
                             ->required()

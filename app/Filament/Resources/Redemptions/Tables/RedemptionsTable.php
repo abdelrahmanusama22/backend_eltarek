@@ -14,11 +14,13 @@ class RedemptionsTable
     {
         return $table
             ->columns([
-                TextColumn::make('user_id')
-                    ->numeric()
+                TextColumn::make('user.name')
+                    ->label('User')
+                    ->searchable()
                     ->sortable(),
-                TextColumn::make('reward_id')
-                    ->numeric()
+                TextColumn::make('reward.name')
+                    ->label('Reward')
+                    ->searchable()
                     ->sortable(),
                 TextColumn::make('code')
                     ->searchable(),

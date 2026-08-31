@@ -26,6 +26,11 @@ class BrandResource extends Resource
         return 'Catalog Management';
     }
 
+    public static function canViewAny(): bool
+    {
+        return true;
+    }
+
     public static function form(Schema $schema): Schema
     {
         return BrandForm::configure($schema);

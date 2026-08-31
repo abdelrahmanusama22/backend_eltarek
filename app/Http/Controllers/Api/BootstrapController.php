@@ -30,9 +30,15 @@ class BootstrapController extends ApiController
 
         $payload = [
             'settings' => [
-                'compare_max' => AppSetting::get('compare_max', 3),
-                'support_phone' => AppSetting::get('support_phone', '19022'),
-                'finance' => AppSetting::get('finance'),
+                'compare_max' => (int) AppSetting::get('compare_max', 3),
+                'support_phone' => (string) AppSetting::get('support_phone', '19022'),
+                'support_whatsapp' => (string) AppSetting::get('support_whatsapp', '+201000000000'),
+                'finance' => AppSetting::get('finance', [
+                    'interest_rate' => 15.0,
+                    'min_down_payment_pct' => 20.0,
+                    'admin_fee_pct' => 1.5,
+                    'max_tenure_years' => 7,
+                ]),
                 'smart_matches' => AppSetting::get('smart_matches', []),
                 'budget_pick_trim_ids' => AppSetting::get('budget_pick_trim_ids', []),
                 'budget_section' => AppSetting::get('budget_section'),
@@ -41,7 +47,7 @@ class BootstrapController extends ApiController
             ],
             'cities' => City::orderBy('sort')->get()->map->toApi(),
             'brands' => Brand::where('active', true)->orderBy('sort')->get()->map->toApi(),
-            'vehicles' => Vehicle::where('active', true)->orderBy('sort')->get()->map->toApi(),
+            'vehicles' => Vehicle::with('trims')->where('active', true)->orderBy('sort')->get()->map->toApi(),
             'trims' => Trim::where('active', true)->get()->map->toApi(),
             'branches' => Branch::where('active', true)->get()->map->toApi(),
         ];

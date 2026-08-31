@@ -16,26 +16,17 @@ use Filament\Tables\Table;
 
 class UserNotificationResource extends Resource
 {
-    public static function getNavigationUrl(): string
-    {
-        return '#';
-    }
-
-    public static function getNavigationBadge(): ?string
-    {
-        return '??????';
-    }
-
-
     protected static ?string $model = UserNotification::class;
-
-    protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedBell;
-
 
     public static function getNavigationGroup(): ?string
     {
         return 'App Engagement';
     }
+
+    protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedBell;
+
+
+
 
     public static function form(Schema $schema): Schema
     {

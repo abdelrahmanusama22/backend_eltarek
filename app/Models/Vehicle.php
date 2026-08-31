@@ -52,11 +52,21 @@ class Vehicle extends Model
             'model_ar'            => $this->model_ar,
             'year'                => $this->year,
             'category'            => $this->category,
-            'starting_price_egp'  => $this->starting_price_egp,
+            'starting_price_egp'  => $this->getStartingPrice(),
             'image_url'           => $this->resolved_image_url,
             'engine_summary'      => $this->engine_summary,
             'monthly_from_egp'    => $this->monthly_from_egp,
             'badge'               => $this->badge,
         ];
+    }
+
+    public function getStartingPrice(): int
+    {
+        if ($this->relationLoaded('trims') && $this->trims->count() > 0) {
+            return (int) $this->trims->min('executive_price');
+        }
+        
+        $min = $this->trims()->min(\Illuminate\Support\Facades\DB::raw('price_egp * (1 + COALESCE(markup_percentage, 5) / 100)'));
+        return (int) ($min ?? $this->starting_price_egp);
     }
 }

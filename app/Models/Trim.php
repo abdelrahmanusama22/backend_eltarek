@@ -23,7 +23,28 @@ class Trim extends Model
         'has_360_view'        => 'boolean',
         'in_test_drive_fleet' => 'boolean',
         'active'              => 'boolean',
+        'is_on_hold'          => 'boolean',
+        'markup_percentage'   => 'float',
     ];
+
+    protected static function booted()
+    {
+        $updateVehiclePrice = function (Trim $trim) {
+            if ($trim->vehicle_id) {
+                $vehicle = Vehicle::find($trim->vehicle_id);
+                if ($vehicle) {
+                    $min = Trim::where('vehicle_id', $vehicle->id)
+                        ->where('active', true)
+                        ->min(\Illuminate\Support\Facades\DB::raw('price_egp * (1 + COALESCE(markup_percentage, 5) / 100)'));
+                    $vehicle->updateQuietly(['starting_price_egp' => (int) ($min ?? 0)]);
+                }
+            }
+        };
+
+        static::saved($updateVehiclePrice);
+        static::deleted($updateVehiclePrice);
+        static::restored($updateVehiclePrice);
+    }
 
     public function vehicle(): BelongsTo
     {
@@ -38,6 +59,15 @@ class Trim extends Model
             if (str_starts_with($path, 'assets/')) return url($path);
             return url('/media/' . $path);
         }, $gallery);
+    }
+
+    /**
+     * Computed executive price = official price × (1 + markup_percentage / 100)
+     * The markup_percentage is editable per trim from the dashboard.
+     */
+    public function getExecutivePriceAttribute(): int
+    {
+        return (int) round($this->price_egp * (1 + ($this->markup_percentage ?? 5) / 100));
     }
 
     public function toApi(): array
@@ -58,6 +88,17 @@ class Trim extends Model
             'specs'                        => $this->specs,
             'metrics'                      => $this->metrics,
             'gallery'                      => $this->resolved_gallery,
+            // Pricing details from import
+            'markup_percentage'            => $this->markup_percentage ?? 5.0,
+            'executive_price'              => $this->executive_price,
+            'total_price'                  => $this->total_price,
+            'booking_deposit'              => $this->booking_deposit,
+            'zero_interest_price'          => $this->zero_interest_price,
+            'price_9pct'                   => $this->price_9pct,
+            // Availability
+            'is_on_hold'                   => $this->is_on_hold,
+            'colors'                       => $this->colors,
+            'financing_notes'              => $this->financing_notes,
         ];
     }
 }

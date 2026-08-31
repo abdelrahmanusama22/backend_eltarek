@@ -31,9 +31,15 @@ class BookingForm
                     ->default(''),
                 TextInput::make('time')
                     ->required(),
-                TextInput::make('status')
+                Select::make('status')
+                    ->options([
+                        'pending' => 'Pending',
+                        'confirmed' => 'Confirmed',
+                        'completed' => 'Completed',
+                        'cancelled' => 'Cancelled',
+                    ])
                     ->required()
-                    ->default('confirmed'),
+                    ->default('pending'),
                 TextInput::make('reference')
                     ->required(),
             ]);

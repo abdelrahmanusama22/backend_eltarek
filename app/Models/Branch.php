@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class Branch extends Model
 {
@@ -25,11 +26,14 @@ class Branch extends Model
     {
         $data = [
             'id' => $this->id,
+            'city_id' => $this->city_id,
+            'image' => $this->image ? asset('storage/' . $this->image) : null,
             'name' => $this->name,
             'name_ar' => $this->name_ar,
             'address' => $this->address,
             'address_ar' => $this->address_ar,
             'phone' => $this->phone,
+            'whatsapp' => $this->whatsapp ?: $this->phone,
             'hours' => $this->hours,
             'hours_ar' => $this->hours_ar,
             'is_open' => $this->is_open,
@@ -54,5 +58,10 @@ class Branch extends Model
             + cos(deg2rad($lat)) * cos(deg2rad((float) $this->lat)) * sin($dLng / 2) ** 2;
 
         return 2 * $r * asin(min(1, sqrt($a)));
+    }
+
+    public function city(): BelongsTo
+    {
+        return $this->belongsTo(City::class);
     }
 }
