@@ -7,57 +7,40 @@ use Filament\Actions\DeleteBulkAction;
 use Filament\Actions\EditAction;
 use Filament\Tables\Columns\IconColumn;
 use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Columns\ToggleColumn;
 use Filament\Tables\Table;
 use Filament\Actions\Action;
 use Filament\Forms\Components\TextInput;
-
-
+use Filament\Tables\Filters\TernaryFilter;
+use Filament\Actions\ExportAction;
+use Filament\Actions\ExportBulkAction;
+use App\Filament\Exports\UserExporter;
 class UsersTable
 {
     public static function configure(Table $table): Table
     {
         return $table
+            ->headerActions([
+                ExportAction::make()
+                    ->exporter(UserExporter::class)
+            ])
             ->columns([
                 TextColumn::make('name')
                     ->searchable(),
-                TextColumn::make('email')
-                    ->label('Email address')
-                    ->searchable(),
-                IconColumn::make('is_admin')
-                    ->boolean(),
                 TextColumn::make('phone')
                     ->searchable(),
-                TextColumn::make('email_verified_at')
-                    ->dateTime()
-                    ->sortable(),
+                ToggleColumn::make('is_active')
+                    ->label('Active'),
+                IconColumn::make('is_admin')
+                    ->boolean(),
                 TextColumn::make('created_at')
                     ->dateTime()
                     ->sortable()
                     ->toggleable(isToggledHiddenByDefault: true),
-                TextColumn::make('updated_at')
-                    ->dateTime()
-                    ->sortable()
-                    ->toggleable(isToggledHiddenByDefault: true),
-                TextColumn::make('age')
-                    ->numeric()
-                    ->sortable(),
-                TextColumn::make('city.name')
-                    ->searchable(),
-                TextColumn::make('vip_tier')
-                    ->searchable(),
-                TextColumn::make('vip_points')
-                    ->numeric()
-                    ->sortable(),
-                TextColumn::make('member_since')
-                    ->date()
-                    ->sortable(),
-                IconColumn::make('profile_complete')
-                    ->boolean(),
-                TextColumn::make('avatar_url')
-                    ->searchable(),
             ])
             ->filters([
-                //
+                TernaryFilter::make('is_admin')
+                    ->label('المديرون')
             ])
             ->recordActions([
                 EditAction::make(),
@@ -76,9 +59,11 @@ class UsersTable
                     ->color("warning"),
                 
             ])
-            ->toolbarActions([
+            ->bulkActions([
                 BulkActionGroup::make([
                     DeleteBulkAction::make(),
+                    ExportBulkAction::make()
+                        ->exporter(UserExporter::class),
                 ]),
             ]);
     }

@@ -25,6 +25,11 @@ class AuthController extends ApiController
             ]);
         }
 
+        $user = User::where('phone', $phone)->first();
+        if ($user && !$user->is_active) {
+            return $this->fail('Your account has been deactivated. Please contact support.', 403);
+        }
+
         // Rate limit: one OTP per phone per resend window.
         $resendSeconds = (int) env('OTP_RESEND_SECONDS', 60);
         $recent = OtpCode::where('phone', $phone)

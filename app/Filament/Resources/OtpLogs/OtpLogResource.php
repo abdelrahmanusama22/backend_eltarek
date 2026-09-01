@@ -7,7 +7,7 @@ use App\Filament\Resources\OtpLogs\Pages\EditOtpLog;
 use App\Filament\Resources\OtpLogs\Pages\ListOtpLogs;
 use App\Filament\Resources\OtpLogs\Schemas\OtpLogForm;
 use App\Filament\Resources\OtpLogs\Tables\OtpLogsTable;
-use App\Models\OtpLog;
+use App\Models\OtpCode;
 use BackedEnum;
 use Filament\Resources\Resource;
 use Illuminate\Database\Eloquent\Model;
@@ -17,22 +17,14 @@ use Filament\Tables\Table;
 
 class OtpLogResource extends Resource
 {
-    public static function getNavigationUrl(): string
-    {
-        return '#';
-    }
 
-    public static function getNavigationBadge(): ?string
-    {
-        return '??????';
-    }
 
 
     public static function canCreate(): bool { return false; }
     public static function canEdit(Model $record): bool { return false; }
     public static function canDelete(Model $record): bool { return false; }
 
-    protected static ?string $model = OtpLog::class;
+    protected static ?string $model = OtpCode::class;
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedKey;
 
