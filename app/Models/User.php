@@ -15,7 +15,7 @@ use Laravel\Sanctum\HasApiTokens;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Spatie\Permission\Traits\HasRoles;
 use Spatie\Activitylog\Models\Concerns\LogsActivity;
-use Spatie\Activitylog\LogOptions;
+use Spatie\Activitylog\Support\LogOptions;
 
 #[Hidden(['password', 'remember_token'])]
 class User extends Authenticatable implements FilamentUser
@@ -29,7 +29,7 @@ class User extends Authenticatable implements FilamentUser
         return LogOptions::defaults()
             ->logOnly(['name', 'email', 'phone', 'is_admin', 'is_active', 'vip_points'])
             ->logOnlyDirty()
-            ->dontSubmitEmptyLogs();
+            ->dontLogEmptyChanges();
     }
 
     protected function casts(): array
@@ -74,6 +74,21 @@ class User extends Authenticatable implements FilamentUser
         return $this->hasMany(UserNotification::class)->latest();
     }
 
+    public function pointTransactions(): HasMany
+    {
+        return $this->hasMany(PointTransaction::class)->latest();
+    }
+
+    public function addPoints(int $points, string $description = null, string $type = 'credit'): void
+    {
+        $this->increment('points', $points);
+        $this->pointTransactions()->create([
+            'points' => $points,
+            'description' => $description,
+            'type' => $type,
+        ]);
+    }
+
     public function redemptions(): HasMany
     {
         return $this->hasMany(Redemption::class);
@@ -93,25 +108,32 @@ class User extends Authenticatable implements FilamentUser
 
     public function vipSummary(): array
     {
-        $tiers = static::tiers();
+        $tiers = AppSetting::get('vip_tiers', [
+            ['key' => 'silver', 'key_ar' => 'فضي', 'threshold' => 0],
+            ['key' => 'gold', 'key_ar' => 'ذهبي', 'threshold' => 5000],
+            ['key' => 'platinum', 'key_ar' => 'بلاتيني', 'threshold' => 15000],
+        ]);
+
         $current = $tiers[0];
         $next = null;
-        foreach ($tiers as $tier) {
-            if ($this->vip_points >= $tier['threshold']) {
+        foreach ($tiers as $index => $tier) {
+            if ($this->points >= $tier['threshold']) {
                 $current = $tier;
-            } elseif ($next === null) {
-                $next = $tier;
+                $next = $tiers[$index + 1] ?? null;
+            } else {
+                break;
             }
         }
-        $toNext = $next ? max(0, $next['threshold'] - $this->vip_points) : 0;
+
+        $toNext = $next ? $next['threshold'] - $this->points : 0;
         $progress = $next && $next['threshold'] > 0
-            ? (int) round($this->vip_points / $next['threshold'] * 100)
+            ? (int) round($this->points / $next['threshold'] * 100)
             : 100;
 
         return [
             'tier' => $current['key'],
             'tier_ar' => $current['key_ar'],
-            'points' => $this->vip_points,
+            'points' => $this->points,
             'member_since' => $this->member_since?->toDateString(),
             'next_tier' => $next['key'] ?? null,
             'points_to_next_tier' => $toNext,

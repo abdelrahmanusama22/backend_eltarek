@@ -5,6 +5,7 @@ namespace App\Filament\Resources\Cities;
 use App\Filament\Resources\Cities\Pages\CreateCity;
 use App\Filament\Resources\Cities\Pages\EditCity;
 use App\Filament\Resources\Cities\Pages\ListCities;
+use App\Filament\Resources\Cities\RelationManagers\BranchesRelationManager;
 use App\Filament\Resources\Cities\Schemas\CityForm;
 use App\Filament\Resources\Cities\Tables\CitiesTable;
 use App\Models\City;
@@ -16,20 +17,9 @@ use Filament\Tables\Table;
 
 class CityResource extends Resource
 {
-    public static function getNavigationUrl(): string
-    {
-        return '#';
-    }
-
-    public static function getNavigationBadge(): ?string
-    {
-        return '??????';
-    }
-
-
     protected static ?string $model = City::class;
 
-    protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedMapPin;
+    protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-map-pin';
 
 
     public static function getNavigationGroup(): ?string
@@ -50,7 +40,7 @@ class CityResource extends Resource
     public static function getRelations(): array
     {
         return [
-            //
+            BranchesRelationManager::class,
         ];
     }
 

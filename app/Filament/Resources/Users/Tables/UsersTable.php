@@ -29,6 +29,11 @@ class UsersTable
                     ->searchable(),
                 TextColumn::make('phone')
                     ->searchable(),
+                TextColumn::make('points')
+                    ->label('Loyalty Points')
+                    ->sortable()
+                    ->badge()
+                    ->color('primary'),
                 ToggleColumn::make('is_active')
                     ->label('Active'),
                 IconColumn::make('is_admin')
@@ -45,14 +50,28 @@ class UsersTable
             ->recordActions([
                 EditAction::make(),
                 Action::make("adjust_points")
+                    ->label('Manage Points')
                     ->action(function ($record, array $data) {
-                        $record->points += $data["points_to_add"];
-                        $record->save();
+                        $record->addPoints(
+                            $data['points'], 
+                            $data['description'], 
+                            $data['type']
+                        );
                     })
                     ->form([
-                        TextInput::make("points_to_add")
-                            ->label("Points to Add/Subtract")
+                        \Filament\Forms\Components\Select::make('type')
+                            ->options([
+                                'credit' => 'Add Points (+)',
+                                'debit' => 'Deduct Points (-)'
+                            ])
+                            ->required()
+                            ->default('credit'),
+                        TextInput::make('points')
+                            ->label('Amount')
                             ->numeric()
+                            ->required(),
+                        TextInput::make('description')
+                            ->label('Reason')
                             ->required(),
                     ])
                     ->icon("heroicon-o-star")

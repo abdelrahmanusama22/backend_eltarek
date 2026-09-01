@@ -26,6 +26,11 @@ class TrimResource extends Resource
         return 'Catalog Management';
     }
 
+    public static function canViewAny(): bool
+    {
+        return true;
+    }
+
     public static function form(Schema $schema): Schema
     {
         return TrimForm::configure($schema);
@@ -49,6 +54,7 @@ class TrimResource extends Resource
             'index' => ListTrims::route('/'),
             'create' => CreateTrim::route('/create'),
             'edit' => EditTrim::route('/{record}/edit'),
+            'import' => \App\Filament\Resources\Trims\Pages\CatalogImportPage::route('/import'),
         ];
     }
 }

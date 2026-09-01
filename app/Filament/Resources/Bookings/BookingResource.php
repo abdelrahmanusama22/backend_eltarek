@@ -16,15 +16,7 @@ use Filament\Tables\Table;
 
 class BookingResource extends Resource
 {
-    public static function getNavigationUrl(): string
-    {
-        return '#';
-    }
 
-    public static function getNavigationBadge(): ?string
-    {
-        return '??????';
-    }
 
 
     protected static ?string $model = Booking::class;

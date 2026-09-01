@@ -11,14 +11,21 @@ class CityForm
     {
         return $schema
             ->components([
-                TextInput::make('name')
-                    ->required(),
-                TextInput::make('name_ar')
-                    ->required(),
-                TextInput::make('sort')
-                    ->required()
-                    ->numeric()
-                    ->default(0),
+                \Filament\Schemas\Components\Section::make('معلومات المدينة')
+                    ->description('أدخل بيانات المدينة وترتيبها')
+                    ->schema([
+                        TextInput::make('name')
+                            ->label('الاسم (English)')
+                            ->required(),
+                        TextInput::make('name_ar')
+                            ->label('الاسم (Arabic)')
+                            ->required(),
+                        TextInput::make('sort')
+                            ->label('الترتيب (Sort)')
+                            ->required()
+                            ->numeric()
+                            ->default(0),
+                    ])->columns(2),
             ]);
     }
 }

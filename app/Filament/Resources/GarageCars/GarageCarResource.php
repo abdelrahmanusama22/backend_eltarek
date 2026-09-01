@@ -16,26 +16,17 @@ use Filament\Tables\Table;
 
 class GarageCarResource extends Resource
 {
-    public static function getNavigationUrl(): string
-    {
-        return '#';
-    }
-
-    public static function getNavigationBadge(): ?string
-    {
-        return '??????';
-    }
-
-
     protected static ?string $model = GarageCar::class;
-
-    protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedWrenchScrewdriver;
-
 
     public static function getNavigationGroup(): ?string
     {
         return 'App Engagement';
     }
+
+    protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedWrenchScrewdriver;
+
+
+
 
     public static function form(Schema $schema): Schema
     {

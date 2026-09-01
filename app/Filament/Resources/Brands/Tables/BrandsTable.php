@@ -20,16 +20,24 @@ class BrandsTable
                     ->searchable(),
                 TextColumn::make('name_ar')
                     ->searchable(),
+                TextColumn::make('vehicles_count')
+                    ->label('Vehicles')
+                    ->counts('vehicles')
+                    ->sortable(),
                 TextColumn::make('tagline')
-                    ->searchable(),
+                    ->searchable()
+                    ->toggleable(isToggledHiddenByDefault: true),
                 TextColumn::make('tagline_ar')
-                    ->searchable(),
+                    ->searchable()
+                    ->toggleable(isToggledHiddenByDefault: true),
                 TextColumn::make('monogram')
-                    ->searchable(),
+                    ->searchable()
+                    ->toggleable(isToggledHiddenByDefault: true),
                 TextColumn::make('tier')
                     ->searchable(),
                 TextColumn::make('logo_url')
-                    ->searchable(),
+                    ->searchable()
+                    ->toggleable(isToggledHiddenByDefault: true),
                 TextColumn::make('sort')
                     ->numeric()
                     ->sortable(),
@@ -38,15 +46,22 @@ class BrandsTable
             ])
             ->filters([
                 TrashedFilter::make(),
-                //
             ])
             ->recordActions([
-                EditAction::make(),
+                \Filament\Actions\EditAction::make(),
+            ])
+            ->bulkActions([
+                \Filament\Actions\BulkActionGroup::make([
+                    \Filament\Actions\DeleteBulkAction::make(),
+                ]),
             ])
             ->toolbarActions([
-                BulkActionGroup::make([
-                    DeleteBulkAction::make(),
-                ]),
+                \Filament\Actions\ExportAction::make()
+                    ->exporter(\App\Filament\Exports\BrandExporter::class),
+                \Filament\Actions\Action::make('import')
+                    ->label('Import / Update Catalog')
+                    ->icon('heroicon-o-arrow-down-tray')
+                    ->url(fn () => \App\Filament\Resources\Trims\TrimResource::getUrl('import')),
             ]);
     }
 }

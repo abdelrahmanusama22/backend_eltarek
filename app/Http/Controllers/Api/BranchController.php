@@ -12,8 +12,15 @@ class BranchController extends ApiController
     {
         $lat = $request->filled('lat') ? (float) $request->input('lat') : null;
         $lng = $request->filled('lng') ? (float) $request->input('lng') : null;
+        $cityId = $request->filled('city_id') ? (int) $request->input('city_id') : null;
 
-        $branches = Branch::where('active', true)->get();
+        $query = Branch::where('active', true);
+
+        if ($cityId) {
+            $query->where('city_id', $cityId);
+        }
+
+        $branches = $query->get();
 
         if ($q = $request->string('q')->toString()) {
             $branches = $branches->filter(fn (Branch $b) => str_contains(strtolower($b->name), strtolower($q))

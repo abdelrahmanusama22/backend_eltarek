@@ -16,26 +16,17 @@ use Filament\Tables\Table;
 
 class RedemptionResource extends Resource
 {
-    public static function getNavigationUrl(): string
-    {
-        return '#';
-    }
-
-    public static function getNavigationBadge(): ?string
-    {
-        return '??????';
-    }
-
-
     protected static ?string $model = Redemption::class;
-
-    protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedTicket;
-
 
     public static function getNavigationGroup(): ?string
     {
         return 'App Engagement';
     }
+
+    protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedTicket;
+
+
+
 
     public static function form(Schema $schema): Schema
     {

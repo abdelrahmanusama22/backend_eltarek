@@ -13,7 +13,7 @@ class VehicleController extends ApiController
     public function index(Request $request): JsonResponse
     {
         $request->validate([
-            'category' => ['nullable', 'in:SUV,Sedan,Electric,Coupe'],
+            'category' => ['nullable', 'in:SUV,Sedan,Electric,Coupe,Hatchback,Pickup,Van,Other'],
             'sort' => ['nullable', 'in:price_asc,price_desc,newest'],
         ]);
 

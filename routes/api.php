@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Api\AnalyticsController;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\BootstrapController;
 use App\Http\Controllers\Api\BranchController;
@@ -53,6 +54,7 @@ Route::prefix('v1')->group(function () {
     Route::get('test-drives/slots', [TestDriveController::class, 'slots']);
 
     Route::get('cities', [CityController::class, 'index']);
+    Route::post('analytics/event', [AnalyticsController::class, 'log']);
 
     // ------------------------------------------------------- authenticated
     Route::middleware('auth:sanctum')->group(function () {
@@ -66,6 +68,7 @@ Route::prefix('v1')->group(function () {
         Route::put('profile', [ProfileController::class, 'update']);
         Route::get('profile/garage', [ProfileController::class, 'garage']);
         Route::get('profile/favorites', [ProfileController::class, 'favorites']);
+        Route::get('profile/points-history', [ProfileController::class, 'pointsHistory']);
         Route::get('profile/rewards', [ProfileController::class, 'rewards']);
         Route::post('profile/rewards/redeem', [ProfileController::class, 'redeem']);
         Route::get('profile/vip/benefits', [ProfileController::class, 'benefits']);

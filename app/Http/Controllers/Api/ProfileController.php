@@ -71,6 +71,22 @@ class ProfileController extends ApiController
         );
     }
 
+    public function pointsHistory(Request $request): JsonResponse
+    {
+        $user = $request->user();
+        
+        return $this->ok([
+            'points_balance' => $user->points,
+            'transactions' => $user->pointTransactions()->latest()->get()->map(fn ($t) => [
+                'id' => $t->id,
+                'points' => $t->points,
+                'type' => $t->type,
+                'description' => $t->description,
+                'date' => $t->created_at->toIso8601String(),
+            ])
+        ]);
+    }
+
     public function redeem(Request $request): JsonResponse
     {
         $request->validate(['reward_id' => ['required', 'integer']]);
@@ -81,18 +97,24 @@ class ProfileController extends ApiController
         }
 
         $user = $request->user();
-        if ($user->vip_points < $reward->points_cost) {
+        if ($user->points < $reward->points_cost) {
             return $this->fail(
                 sprintf(
-                    'Insufficient VIP points. You need %s points but currently have %s.',
+                    'Insufficient points. You need %s points but currently have %s.',
                     number_format($reward->points_cost),
-                    number_format($user->vip_points),
+                    number_format($user->points),
                 ),
                 400,
             );
         }
 
-        $user->decrement('vip_points', $reward->points_cost);
+        $user->decrement('points', $reward->points_cost);
+        $user->pointTransactions()->create([
+            'points' => -$reward->points_cost,
+            'type' => 'debit',
+            'description' => "Redeemed reward: {$reward->name}"
+        ]);
+
         $redemption = $user->redemptions()->create([
             'reward_id' => $reward->id,
             'code' => 'RWD-'.now()->year.'-'.Str::upper(Str::random(4)),
@@ -103,7 +125,7 @@ class ProfileController extends ApiController
         return $this->ok([
             'reward' => ['id' => $reward->id, 'name' => $reward->name],
             'points_spent' => $reward->points_cost,
-            'points_remaining' => $user->fresh()->vip_points,
+            'points_remaining' => $user->fresh()->points,
             'redemption_code' => $redemption->code,
             'valid_until' => $redemption->valid_until,
         ], 'Reward redeemed successfully.');

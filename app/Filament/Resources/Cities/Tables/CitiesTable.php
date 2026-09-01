@@ -15,12 +15,17 @@ class CitiesTable
         return $table
             ->columns([
                 TextColumn::make('name')
+                    ->label('الاسم')
                     ->searchable(),
                 TextColumn::make('name_ar')
+                    ->label('الاسم بالعربي')
                     ->searchable(),
                 TextColumn::make('sort')
+                    ->label('الترتيب')
                     ->numeric()
-                    ->sortable(),
+                    ->sortable()
+                    ->badge()
+                    ->color('primary'),
             ])
             ->filters([
                 //
