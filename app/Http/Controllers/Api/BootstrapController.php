@@ -28,7 +28,7 @@ class BootstrapController extends ApiController
             ->orderBy('fleet_sort')
             ->pluck('id');
 
-        return $this->ok([
+        $payload = [
             'settings' => [
                 'compare_max' => AppSetting::get('compare_max', 3),
                 'support_phone' => AppSetting::get('support_phone', '19022'),
@@ -44,10 +44,14 @@ class BootstrapController extends ApiController
             'vehicles' => Vehicle::where('active', true)->orderBy('sort')->get()->map->toApi(),
             'trims' => Trim::where('active', true)->get()->map->toApi(),
             'branches' => Branch::where('active', true)->get()->map->toApi(),
-            'rewards' => Reward::where('active', true)->get()
-                ->map(fn (Reward $r) => $r->toApi($user)),
-            'slots' => SlotService::upcoming(),
-            'garage' => $user?->garageCars()->get()->map->toApi(),
-        ]);
+        ];
+
+        // Dynamic parts (user-specific or highly volatile)
+        $payload['rewards'] = Reward::where('active', true)->get()
+            ->map(fn (Reward $r) => $r->toApi($user));
+        $payload['slots'] = SlotService::upcoming();
+        $payload['garage'] = $user?->garageCars()->get()->map->toApi();
+
+        return $this->ok($payload);
     }
 }

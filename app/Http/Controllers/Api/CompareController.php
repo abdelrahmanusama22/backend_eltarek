@@ -11,14 +11,14 @@ use Illuminate\Support\Facades\Cache;
 class CompareController extends ApiController
 {
     private const ATTRIBUTES = [
-        // metric key → [group, label, label_ar]
-        'hp' => ['performance', 'Horsepower', 'القوة الحصانية'],
-        'accel' => ['performance', '0-100 km/h', 'التسارع'],
-        'top' => ['performance', 'Top Speed', 'السرعة القصوى'],
-        'engine' => ['engine_specs', 'Engine', 'المحرك'],
-        'fuel' => ['engine_specs', 'Fuel Economy', 'استهلاك الوقود'],
-        'airbags' => ['safety_tech', 'Airbags', 'الوسائد الهوائية'],
-        'sunroof' => ['safety_tech', 'Sunroof', 'فتحة سقف'],
+        // metric key ??? [group, label, label_ar]
+        'hp' => ['performance', 'Horsepower', '?????????? ????????????????'],
+        'accel' => ['performance', '0-100 km/h', '??????????????'],
+        'top' => ['performance', 'Top Speed', '???????????? ????????????'],
+        'engine' => ['engine_specs', 'Engine', '????????????'],
+        'fuel' => ['engine_specs', 'Fuel Economy', '?????????????? ????????????'],
+        'airbags' => ['safety_tech', 'Airbags', '?????????????? ????????????????'],
+        'sunroof' => ['safety_tech', 'Sunroof', '???????? ??????'],
     ];
 
     /** GET /compare?trim_ids=401,402 */
@@ -54,7 +54,7 @@ class CompareController extends ApiController
             $scores = [];
             foreach ($trims as $trim) {
                 $metric = $trim->metrics[$key] ?? null;
-                $values[] = $metric['display'] ?? '—';
+                $values[] = $metric['display'] ?? '???';
                 $scores[] = $metric['score'] ?? null;
             }
 
@@ -86,7 +86,7 @@ class CompareController extends ApiController
                 'name_ar' => $t->vehicle->model_ar,
                 'year' => $t->vehicle->year,
                 'price_egp' => $t->price_egp,
-                'image_url' => $t->vehicle->image_url,
+                'image_url' => $t->vehicle->resolved_image_url,
             ]),
             'comparison' => $groups,
             'recommended' => [
@@ -99,7 +99,7 @@ class CompareController extends ApiController
         ]);
     }
 
-    /** POST /compare — server-side list for cross-device continuity. */
+    /** POST /compare ??? server-side list for cross-device continuity. */
     public function add(Request $request): JsonResponse
     {
         $request->validate(['trim_id' => ['required', 'integer', 'exists:trims,id']]);

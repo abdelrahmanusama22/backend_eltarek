@@ -23,9 +23,18 @@ class SlotService
         ]);
         $daysAhead = (int) ($config['days_ahead'] ?? 7);
 
+
+        $blockedDates = AppSetting::get('blocked_dates', []);
+        $blockedDatesArray = array_column($blockedDates, 'date');
+
         $slots = [];
         for ($offset = 0; $offset < $daysAhead; $offset++) {
             $day = Carbon::today()->addDays($offset);
+            
+            if (in_array($day->toDateString(), $blockedDatesArray)) {
+                continue; // Skip holiday/blocked date
+            }
+
             $key = strtolower($day->format('D')); // sun, mon, fri…
             $times = $config[$key] ?? $config['default'] ?? [];
             if (empty($times)) {
