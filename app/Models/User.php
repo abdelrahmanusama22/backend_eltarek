@@ -22,12 +22,25 @@ class User extends Authenticatable implements FilamentUser
 {
     use HasApiTokens, HasFactory, Notifiable, SoftDeletes, HasRoles, LogsActivity;
 
-    protected $guarded = [];
+    protected $fillable = [
+        'name',
+        'email',
+        'phone',
+        'password',
+        'age',
+        'city_id',
+        'avatar_url',
+        'profile_complete',
+        'is_active',
+        'is_admin',
+        'points',
+        'member_since',
+    ];
 
     public function getActivitylogOptions(): LogOptions
     {
         return LogOptions::defaults()
-            ->logOnly(['name', 'email', 'phone', 'is_admin', 'is_active', 'vip_points'])
+            ->logOnly(['name', 'email', 'phone', 'is_admin', 'is_active', 'points'])
             ->logOnlyDirty()
             ->dontLogEmptyChanges();
     }
@@ -40,6 +53,8 @@ class User extends Authenticatable implements FilamentUser
             'member_since' => 'date',
             'profile_complete' => 'boolean',
             'is_active' => 'boolean',
+            'is_admin' => 'boolean',
+            'points' => 'integer',
         ];
     }
 
@@ -79,11 +94,19 @@ class User extends Authenticatable implements FilamentUser
         return $this->hasMany(PointTransaction::class)->latest();
     }
 
-    public function addPoints(int $points, string $description = null, string $type = 'credit'): void
+    public function addPoints(int $points, ?string $description = null, string $type = 'credit'): void
     {
-        $this->increment('points', $points);
+        $amount = abs($points);
+        if ($type === 'debit') {
+            $this->decrement('points', $amount);
+            $txAmount = -$amount;
+        } else {
+            $this->increment('points', $amount);
+            $txAmount = $amount;
+        }
+
         $this->pointTransactions()->create([
-            'points' => $points,
+            'points' => $txAmount,
             'description' => $description,
             'type' => $type,
         ]);
@@ -101,18 +124,14 @@ class User extends Authenticatable implements FilamentUser
     {
         return AppSetting::get('vip_tiers', [
             ['key' => 'silver', 'key_ar' => 'فضي', 'threshold' => 0],
-            ['key' => 'gold', 'key_ar' => 'ذهبي', 'threshold' => 15000],
-            ['key' => 'platinum', 'key_ar' => 'بلاتيني', 'threshold' => 50000],
+            ['key' => 'gold', 'key_ar' => 'ذهبي', 'threshold' => 5000],
+            ['key' => 'platinum', 'key_ar' => 'بلاتيني', 'threshold' => 15000],
         ]);
     }
 
     public function vipSummary(): array
     {
-        $tiers = AppSetting::get('vip_tiers', [
-            ['key' => 'silver', 'key_ar' => 'فضي', 'threshold' => 0],
-            ['key' => 'gold', 'key_ar' => 'ذهبي', 'threshold' => 5000],
-            ['key' => 'platinum', 'key_ar' => 'بلاتيني', 'threshold' => 15000],
-        ]);
+        $tiers = self::tiers();
 
         $current = $tiers[0];
         $next = null;
@@ -125,19 +144,22 @@ class User extends Authenticatable implements FilamentUser
             }
         }
 
-        $toNext = $next ? $next['threshold'] - $this->points : 0;
-        $progress = $next && $next['threshold'] > 0
-            ? (int) round($this->points / $next['threshold'] * 100)
+        $toNext = $next ? max(0, $next['threshold'] - $this->points) : 0;
+        $currentFloor = $current['threshold'];
+        $nextCeil = $next['threshold'] ?? $currentFloor;
+        $tierSpan = $nextCeil - $currentFloor;
+        $progress = ($next && $tierSpan > 0)
+            ? (int) round(($this->points - $currentFloor) / $tierSpan * 100)
             : 100;
 
         return [
             'tier' => $current['key'],
             'tier_ar' => $current['key_ar'],
-            'points' => $this->points,
+            'points' => (int) $this->points,
             'member_since' => $this->member_since?->toDateString(),
             'next_tier' => $next['key'] ?? null,
             'points_to_next_tier' => $toNext,
-            'progress_percent' => min(100, $progress),
+            'progress_percent' => min(100, max(0, $progress)),
         ];
     }
 

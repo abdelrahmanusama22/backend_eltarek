@@ -48,4 +48,11 @@ return [
         'otp_template' => env('SMSMISR_OTP_TEMPLATE'),
     ],
 
+    'otp' => [
+        'length' => (int) env('OTP_LENGTH', 4),
+        'ttl_seconds' => (int) env('OTP_TTL_SECONDS', 300),
+        'resend_seconds' => (int) env('OTP_RESEND_SECONDS', 60),
+        'max_attempts' => (int) env('OTP_MAX_ATTEMPTS', 5),
+    ],
+
 ];

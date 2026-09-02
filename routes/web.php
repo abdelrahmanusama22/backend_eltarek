@@ -6,23 +6,24 @@ Route::get('/', function () {
     return view('welcome');
 });
 
-Route::any('/media/{path}', function ($path) {
-    $filePath = storage_path('app/public/' . $path);
-    if (!file_exists($filePath)) abort(404);
-    
+Route::match(['GET', 'HEAD', 'OPTIONS'], '/media/{path}', function ($path) {
     if (request()->getMethod() === 'OPTIONS') {
         return response('', 200)
             ->header('Access-Control-Allow-Origin', '*')
-            ->header('Access-Control-Allow-Methods', 'GET, OPTIONS')
+            ->header('Access-Control-Allow-Methods', 'GET, HEAD, OPTIONS')
             ->header('Access-Control-Allow-Headers', '*');
     }
-    
-    $file = file_get_contents($filePath);
-    $type = mime_content_type($filePath);
-    
-    return response($file, 200)
-        ->header('Content-Type', $type)
-        ->header('Access-Control-Allow-Origin', '*')
-        ->header('Access-Control-Allow-Methods', 'GET, OPTIONS')
-        ->header('Access-Control-Allow-Headers', '*');
+
+    $basePath = realpath(storage_path('app/public'));
+    $filePath = storage_path('app/public/' . $path);
+    $realPath = realpath($filePath);
+
+    if (! $basePath || ! $realPath || ! str_starts_with($realPath, $basePath) || ! is_file($realPath)) {
+        abort(404);
+    }
+
+    return response()->file($realPath, [
+        'Access-Control-Allow-Origin' => '*',
+        'Access-Control-Allow-Methods' => 'GET, HEAD, OPTIONS',
+    ]);
 })->where('path', '.*');

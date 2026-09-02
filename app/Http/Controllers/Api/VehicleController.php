@@ -38,7 +38,8 @@ class VehicleController extends ApiController
             default => $query->orderBy('sort'),
         };
 
-        $page = $query->paginate($request->integer('per_page') ?: 15);
+        $perPage = min(max(1, $request->integer('per_page') ?: 15), 50);
+        $page = $query->paginate($perPage);
 
         return $this->ok(
             collect($page->items())->map(fn (Vehicle $v) => $this->vehicleListItem($v)),
@@ -56,18 +57,19 @@ class VehicleController extends ApiController
     /** GET /vehicles/search?q= */
     public function search(Request $request): JsonResponse
     {
-        $request->validate(['q' => ['required', 'string', 'min:1']]);
+        $request->validate(['q' => ['required', 'string', 'min:1', 'max:80']]);
         $q = $request->string('q')->toString();
+        $escapedQ = str_replace(['\\', '%', '_'], ['\\\\', '\\%', '\\_'], $q);
 
         $vehicles = Vehicle::with(['brand', 'trims'])
             ->where('active', true)
-            ->where(function ($query) use ($q) {
-                $query->where('model', 'like', "%{$q}%")
-                    ->orWhere('model_ar', 'like', "%{$q}%")
-                    ->orWhere('year', 'like', "%{$q}%")
+            ->where(function ($query) use ($escapedQ) {
+                $query->where('model', 'like', "%{$escapedQ}%")
+                    ->orWhere('model_ar', 'like', "%{$escapedQ}%")
+                    ->orWhere('year', 'like', "%{$escapedQ}%")
                     ->orWhereHas('brand', fn ($b) => $b
-                        ->where('name', 'like', "%{$q}%")
-                        ->orWhere('name_ar', 'like', "%{$q}%"));
+                        ->where('name', 'like', "%{$escapedQ}%")
+                        ->orWhere('name_ar', 'like', "%{$escapedQ}%"));
             })
             ->limit(30)
             ->get();
@@ -101,7 +103,7 @@ class VehicleController extends ApiController
             ? Trim::with('vehicle')->find($trim->suggested_comparison_trim_id)
             : null;
 
-        // "BMW X5 M50i" + trim "M50i" ??? keep "BMW X5 M50i", not "??? M50i M50i".
+        // "BMW X5 M50i" + trim "M50i" => keep "BMW X5 M50i", not "BMW X5 M50i M50i".
         $displayName = str_ends_with($vehicle->model, $trim->name)
             ? $vehicle->model
             : trim("{$vehicle->model} {$trim->name}");
@@ -135,7 +137,7 @@ class VehicleController extends ApiController
     private function vehicleListItem(Vehicle $vehicle): array
     {
         return array_merge($vehicle->toApi(), [
-            'brand' => $vehicle->brand->toApi(),
+            'brand' => $vehicle->brand?->toApi() ?? ['id' => $vehicle->brand_id, 'name' => ''],
             'trims_count' => $vehicle->trims->count(),
             'primary_trim_id' => $vehicle->trims->first()?->id,
             'availability' => 'available',

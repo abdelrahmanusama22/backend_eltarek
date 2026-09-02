@@ -39,7 +39,7 @@ class Booking extends Model
                 'trim_id' => $this->trim_id,
                 'name' => $vehicle ? trim($vehicle->model.' '.$this->trim->name) : '',
                 'name_ar' => $vehicle ? trim($vehicle->model_ar.' '.$this->trim->name_ar) : '',
-                'image_url' => $vehicle->image_url ?? '',
+                'image_url' => $vehicle?->resolved_image_url ?? '',
             ],
             'branch' => [
                 'id' => $this->branch_id,
