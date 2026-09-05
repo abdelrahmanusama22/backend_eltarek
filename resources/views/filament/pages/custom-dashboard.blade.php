@@ -28,12 +28,22 @@ $thisM = \App\Models\Booking::whereMonth('created_at', now()->month)->count();
 $lastM = \App\Models\Booking::whereMonth('created_at', now()->subMonth()->month)->count();
 $growth = $lastM > 0 ? round((($thisM - $lastM) / $lastM) * 100, 1) : 0;
 
-$chartData = collect(range(13, 0))->map(function($d) {
+$chartStartDate = now()->subDays(13)->startOfDay();
+$chartCounts = \App\Models\Booking::where('created_at', '>=', $chartStartDate)
+    ->whereIn('status', ['confirmed', 'pending'])
+    ->selectRaw('DATE(created_at) as date_key, status, count(*) as total')
+    ->groupBy('date_key', 'status')
+    ->get()
+    ->groupBy('date_key');
+
+$chartData = collect(range(13, 0))->map(function($d) use ($chartCounts) {
     $date = now()->subDays($d);
+    $dateKey = $date->toDateString();
+    $dayRows = $chartCounts->get($dateKey, collect())->keyBy('status');
     return [
         'label'     => $date->format('M d'),
-        'confirmed' => \App\Models\Booking::whereDate('created_at', $date)->where('status','confirmed')->count(),
-        'pending'   => \App\Models\Booking::whereDate('created_at', $date)->where('status','pending')->count(),
+        'confirmed' => (int) ($dayRows->get('confirmed')->total ?? 0),
+        'pending'   => (int) ($dayRows->get('pending')->total ?? 0),
     ];
 });
 
