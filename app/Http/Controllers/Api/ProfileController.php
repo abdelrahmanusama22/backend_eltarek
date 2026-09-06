@@ -7,6 +7,7 @@ use App\Models\Reward;
 use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
 class ProfileController extends ApiController
@@ -96,38 +97,53 @@ class ProfileController extends ApiController
             return $this->fail('Reward not found or no longer available.', 404);
         }
 
-        $user = $request->user();
-        if ($user->points < $reward->points_cost) {
+        $result = DB::transaction(function () use ($request, $reward) {
+            $user = User::whereKey($request->user()->id)->lockForUpdate()->first();
+            if (! $user || $user->points < $reward->points_cost) {
+                return null;
+            }
+
+            $user->decrement('points', $reward->points_cost);
+            $user->pointTransactions()->create([
+                'points' => -$reward->points_cost,
+                'type' => 'debit',
+                'description' => "Redeemed reward: {$reward->name}",
+            ]);
+
+            do {
+                $code = 'RWD-'.now()->year.'-'.Str::upper(Str::random(6));
+            } while ($user->redemptions()->where('code', $code)->exists());
+
+            $redemption = $user->redemptions()->create([
+                'reward_id' => $reward->id,
+                'code' => $code,
+                'points_spent' => $reward->points_cost,
+                'valid_until' => now()->addMonths(6)->toDateString(),
+            ]);
+
+            return [
+                'points_remaining' => $user->points,
+                'redemption' => $redemption,
+            ];
+        });
+
+        if (! $result) {
             return $this->fail(
                 sprintf(
                     'Insufficient points. You need %s points but currently have %s.',
                     number_format($reward->points_cost),
-                    number_format($user->points),
+                    number_format($request->user()->fresh()->points),
                 ),
                 400,
             );
         }
 
-        $user->decrement('points', $reward->points_cost);
-        $user->pointTransactions()->create([
-            'points' => -$reward->points_cost,
-            'type' => 'debit',
-            'description' => "Redeemed reward: {$reward->name}"
-        ]);
-
-        $redemption = $user->redemptions()->create([
-            'reward_id' => $reward->id,
-            'code' => 'RWD-'.now()->year.'-'.Str::upper(Str::random(4)),
-            'points_spent' => $reward->points_cost,
-            'valid_until' => now()->addMonths(6)->toDateString(),
-        ]);
-
         return $this->ok([
             'reward' => ['id' => $reward->id, 'name' => $reward->name],
             'points_spent' => $reward->points_cost,
-            'points_remaining' => $user->fresh()->points,
-            'redemption_code' => $redemption->code,
-            'valid_until' => $redemption->valid_until,
+            'points_remaining' => $result['points_remaining'],
+            'redemption_code' => $result['redemption']->code,
+            'valid_until' => $result['redemption']->valid_until,
         ], 'Reward redeemed successfully.');
     }
 

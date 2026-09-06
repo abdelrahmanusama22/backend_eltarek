@@ -53,10 +53,14 @@ class UsersTable
                     ->label('Manage Points')
                     ->action(function ($record, array $data) {
                         $record->addPoints(
-                            $data['points'], 
+                            (int) $data['points'], 
                             $data['description'], 
                             $data['type']
                         );
+                        \Filament\Notifications\Notification::make()
+                            ->title($data['type'] === 'debit' ? 'Points deducted successfully' : 'Points added successfully')
+                            ->success()
+                            ->send();
                     })
                     ->form([
                         \Filament\Forms\Components\Select::make('type')

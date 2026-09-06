@@ -8,6 +8,7 @@ use App\Models\UserNotification;
 use App\Services\SlotService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
 class TestDriveController extends ApiController
@@ -63,35 +64,56 @@ class TestDriveController extends ApiController
 
         $user = $request->user();
 
-        // Same-slot double booking guard.
-        $clash = Booking::where('status', 'confirmed')
-            ->where('branch_id', $validated['branch_id'])
-            ->where('time', $validated['time'])
-            ->when(isset($validated['date']), fn ($q) => $q->whereDate('date', $validated['date']))
-            ->where('trim_id', $validated['trim_id'])
-            ->exists();
-        if ($clash) {
+        $booking = DB::transaction(function () use ($validated, $user) {
+            // Same-slot double booking guard with lock
+            $clash = Booking::where('status', 'confirmed')
+                ->where('branch_id', $validated['branch_id'])
+                ->where('time', $validated['time'])
+                ->when(isset($validated['date']), fn ($q) => $q->whereDate('date', $validated['date']))
+                ->where('trim_id', $validated['trim_id'])
+                ->lockForUpdate()
+                ->exists();
+
+            if ($clash) {
+                return null;
+            }
+
+            $dayLabel = $validated['day_label'] ?? '';
+            $dayLabelAr = match ($dayLabel) {
+                'Today' => 'اليوم',
+                'Tomorrow' => 'غداً',
+                default => $dayLabel,
+            };
+
+            do {
+                $ref = 'TD-'.now()->year.'-'.Str::upper(Str::random(6));
+            } while (Booking::where('reference', $ref)->exists());
+
+            $created = $user->bookings()->create([
+                'trim_id' => $validated['trim_id'],
+                'branch_id' => $validated['branch_id'],
+                'date' => $validated['date'] ?? null,
+                'day_label' => $dayLabel,
+                'day_label_ar' => $dayLabelAr,
+                'time' => $validated['time'],
+                'reference' => $ref,
+            ]);
+
+            UserNotification::create([
+                'user_id' => $user->id,
+                'type' => 'booking_reminder',
+                'title' => 'Test drive confirmed',
+                'title_ar' => 'تم تأكيد موعد تجربة القيادة',
+                'body' => "Reference {$created->reference} — our team will contact you shortly.",
+                'body_ar' => "رقم الحجز {$created->reference} — سيتواصل معك فريقنا في أقرب وقت.",
+            ]);
+
+            return $created;
+        });
+
+        if (! $booking) {
             return $this->fail('This time slot was just taken. Please pick another slot.', 409);
         }
-
-        $booking = $user->bookings()->create([
-            'trim_id' => $validated['trim_id'],
-            'branch_id' => $validated['branch_id'],
-            'date' => $validated['date'] ?? null,
-            'day_label' => $validated['day_label'] ?? '',
-            'day_label_ar' => '',
-            'time' => $validated['time'],
-            'reference' => 'TD-'.now()->year.'-'.Str::upper(Str::random(4)),
-        ]);
-
-        UserNotification::create([
-            'user_id' => $user->id,
-            'type' => 'booking_reminder',
-            'title' => 'Test drive confirmed',
-            'title_ar' => '???? ?????????? ?????????? ??????????????',
-            'body' => "Reference {$booking->reference} ??? our team will contact you shortly.",
-            'body_ar' => "?????? ?????????? {$booking->reference} ??? ?????????????? ?????? ???????????? ????????????.",
-        ]);
 
         return $this->ok(
             $booking->load(['trim.vehicle', 'branch'])->toApi(),

@@ -39,6 +39,11 @@ class BookingResource extends Resource
         return BookingsTable::configure($table);
     }
 
+    public static function getEloquentQuery(): \Illuminate\Database\Eloquent\Builder
+    {
+        return parent::getEloquentQuery()->with(['user', 'trim.vehicle', 'branch']);
+    }
+
     public static function getRelations(): array
     {
         return [

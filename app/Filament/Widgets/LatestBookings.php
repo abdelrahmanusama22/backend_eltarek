@@ -17,7 +17,7 @@ class LatestBookings extends BaseWidget
     {
         return $table
             ->query(
-                Booking::query()->latest()->limit(5)
+                Booking::query()->with(['user', 'trim', 'branch'])->latest()->limit(5)
             )
             ->columns([
                 Tables\Columns\TextColumn::make('id')

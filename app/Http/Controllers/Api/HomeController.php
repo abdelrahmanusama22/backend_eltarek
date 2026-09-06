@@ -24,7 +24,7 @@ class HomeController extends ApiController
                 "vehicle_id" => $v->id,
                 "title"      => $v->model,
                 "title_ar"   => $v->model_ar,
-                "subtitle"   => "{$v->engine_summary} ? {$v->year}",
+                "subtitle"   => "{$v->engine_summary} • {$v->year}",
                 "badge"      => $v->badge,
                 "image_url"  => $v->resolved_image_url,
                 "cta_label"  => "Explore",

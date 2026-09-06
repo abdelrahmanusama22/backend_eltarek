@@ -54,7 +54,7 @@ Route::prefix('v1')->group(function () {
     Route::get('test-drives/slots', [TestDriveController::class, 'slots']);
 
     Route::get('cities', [CityController::class, 'index']);
-    Route::post('analytics/event', [AnalyticsController::class, 'log']);
+    Route::post('analytics/event', [AnalyticsController::class, 'log'])->middleware('throttle:60,1');
 
     // ------------------------------------------------------- authenticated
     Route::middleware('auth:sanctum')->group(function () {

@@ -23,7 +23,13 @@ class BrandController extends ApiController
 
     public function show(Request $request, Brand $brand): JsonResponse
     {
-        $models = $brand->vehicles()->with('trims')->get();
+        $allVehicles = $brand->vehicles()->with('trims')->get();
+        $categories = array_values(array_unique(array_merge(
+            ['All'],
+            $allVehicles->pluck('category')->filter()->unique()->values()->all(),
+        )));
+
+        $models = $allVehicles;
         if ($category = $request->string('category')->toString()) {
             if ($category !== 'All') {
                 $models = $models->where('category', $category)->values();
@@ -31,10 +37,7 @@ class BrandController extends ApiController
         }
 
         return $this->ok(array_merge($brand->toApi(), [
-            'categories' => array_values(array_unique(array_merge(
-                ['All'],
-                $brand->vehicles()->pluck('category')->unique()->values()->all(),
-            ))),
+            'categories' => $categories,
             'models' => $models->map(fn ($v) => array_merge($v->toApi(), [
                 'trims_count' => $v->trims->count(),
                 'primary_trim_id' => $v->trims->first()?->id,

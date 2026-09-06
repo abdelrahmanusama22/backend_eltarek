@@ -31,7 +31,7 @@ class AuthController extends ApiController
         }
 
         // Rate limit: one OTP per phone per resend window.
-        $resendSeconds = (int) env('OTP_RESEND_SECONDS', 60);
+        $resendSeconds = (int) config('services.otp.resend_seconds', 60);
         $recent = OtpCode::where('phone', $phone)
             ->where('created_at', '>', now()->subSeconds($resendSeconds))
             ->latest()
@@ -46,13 +46,13 @@ class AuthController extends ApiController
             ], 429);
         }
 
-        $length = max(4, (int) env('OTP_LENGTH', 4));
+        $length = max(4, (int) config('services.otp.length', 4));
         $code = str_pad((string) random_int(0, (10 ** $length) - 1), $length, '0', STR_PAD_LEFT);
 
         OtpCode::create([
             'phone' => $phone,
             'code_hash' => Hash::make($code),
-            'expires_at' => now()->addSeconds((int) env('OTP_TTL_SECONDS', 300)),
+            'expires_at' => now()->addSeconds((int) config('services.otp.ttl_seconds', 300)),
         ]);
 
         if (! SmsMisrService::make()->sendOtp($phone, $code)) {
@@ -61,7 +61,7 @@ class AuthController extends ApiController
 
         $data = [
             'phone' => $phone,
-            'expires_in' => (int) env('OTP_TTL_SECONDS', 300),
+            'expires_in' => (int) config('services.otp.ttl_seconds', 300),
             'resend_available_in' => $resendSeconds,
         ];
         // Surface the code during local development (log driver only).
@@ -80,9 +80,10 @@ class AuthController extends ApiController
     /** Step 2 — verify the OTP and issue a Sanctum token. */
     public function verifyOtp(Request $request): JsonResponse
     {
+        $otpLength = max(4, (int) config('services.otp.length', 4));
         $request->validate([
             'phone' => ['required', 'string'],
-            'otp' => ['required', 'digits:'.max(4, (int) env('OTP_LENGTH', 4))],
+            'otp' => ['required', 'digits:'.$otpLength],
         ]);
 
         $phone = $this->normalizePhone($request->string('phone'));
@@ -100,7 +101,7 @@ class AuthController extends ApiController
         if (! $otp || $otp->expires_at->isPast()) {
             return $this->fail('Invalid or expired OTP.', 400);
         }
-        if ($otp->attempts >= (int) env('OTP_MAX_ATTEMPTS', 5)) {
+        if ($otp->attempts >= (int) config('services.otp.max_attempts', 5)) {
             return $this->fail('Too many attempts. Please request a new code.', 429);
         }
 
@@ -115,6 +116,11 @@ class AuthController extends ApiController
             ['phone' => $phone],
             ['member_since' => now()->toDateString()],
         );
+
+        if (! $user->is_active) {
+            return $this->fail('Your account has been deactivated. Please contact support.', 403);
+        }
+
         $isNew = $user->wasRecentlyCreated;
 
         // One active token per device family keeps things simple for now.

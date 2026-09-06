@@ -20,12 +20,20 @@ class AnalyticsController extends ApiController
         $sessionId = $request->input('session_id');
 
         // Handle batch of events
-        if ($request->has('events') && is_array($request->input('events'))) {
-            $events = $request->input('events');
+        if ($request->has('events')) {
+            $validated = $request->validate([
+                'events' => ['required', 'array', 'max:50'],
+                'events.*.event_name' => ['required', 'string', 'max:100'],
+                'events.*.category' => ['nullable', 'string', 'max:50'],
+                'events.*.properties' => ['nullable', 'array'],
+                'events.*.session_id' => ['nullable', 'string', 'max:100'],
+                'events.*.device_info' => ['nullable', 'string', 'max:255'],
+            ]);
+
             $records = [];
             $now = now();
 
-            foreach ($events as $evt) {
+            foreach ($validated['events'] as $evt) {
                 if (empty($evt['event_name'])) continue;
 
                 $records[] = [
@@ -36,7 +44,7 @@ class AnalyticsController extends ApiController
                     'session_id'  => $evt['session_id'] ?? $sessionId,
                     'device_info' => $evt['device_info'] ?? $device,
                     'ip_address'  => $ip,
-                    'created_at'  => $evt['created_at'] ?? $now,
+                    'created_at'  => $now,
                 ];
             }
 

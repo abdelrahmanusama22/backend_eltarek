@@ -11,14 +11,14 @@ use Illuminate\Support\Facades\Cache;
 class CompareController extends ApiController
 {
     private const ATTRIBUTES = [
-        // metric key ??? [group, label, label_ar]
-        'hp' => ['performance', 'Horsepower', '?????????? ????????????????'],
-        'accel' => ['performance', '0-100 km/h', '??????????????'],
-        'top' => ['performance', 'Top Speed', '???????????? ????????????'],
-        'engine' => ['engine_specs', 'Engine', '????????????'],
-        'fuel' => ['engine_specs', 'Fuel Economy', '?????????????? ????????????'],
-        'airbags' => ['safety_tech', 'Airbags', '?????????????? ????????????????'],
-        'sunroof' => ['safety_tech', 'Sunroof', '???????? ??????'],
+        // metric key => [group, label, label_ar]
+        'hp' => ['performance', 'Horsepower', 'قوة الحصان'],
+        'accel' => ['performance', '0-100 km/h', 'التسارع 0-100 كم/س'],
+        'top' => ['performance', 'Top Speed', 'السرعة القصوى'],
+        'engine' => ['engine_specs', 'Engine', 'المحرك'],
+        'fuel' => ['engine_specs', 'Fuel Economy', 'استهلاك الوقود'],
+        'airbags' => ['safety_tech', 'Airbags', 'الوسائد الهوائية'],
+        'sunroof' => ['safety_tech', 'Sunroof', 'فتحة السقف'],
     ];
 
     /** GET /compare?trim_ids=401,402 */
@@ -54,7 +54,7 @@ class CompareController extends ApiController
             $scores = [];
             foreach ($trims as $trim) {
                 $metric = $trim->metrics[$key] ?? null;
-                $values[] = $metric['display'] ?? '???';
+                $values[] = $metric['display'] ?? '—';
                 $scores[] = $metric['score'] ?? null;
             }
 

@@ -32,6 +32,14 @@ class BookingsChart extends ChartWidget
         $pending = [];
         $labels = [];
 
+        $startDate = Carbon::today()->subDays($days - 1)->startOfDay();
+        $counts = Booking::where('created_at', '>=', $startDate)
+            ->whereIn('status', ['confirmed', 'pending'])
+            ->selectRaw('DATE(created_at) as date_key, status, count(*) as aggregate')
+            ->groupBy('date_key', 'status')
+            ->get()
+            ->groupBy('date_key');
+
         for ($i = $days - 1; $i >= 0; $i--) {
             $date = Carbon::today()->subDays($i);
             if ($days <= 7) {
@@ -39,9 +47,12 @@ class BookingsChart extends ChartWidget
             } else {
                 $labels[] = $date->format('M d');
             }
-            // For now use random numbers to match mockup if db is empty or just use DB
-            $c = Booking::whereDate('created_at', $date)->where('status', 'confirmed')->count();
-            $p = Booking::whereDate('created_at', $date)->where('status', 'pending')->count();
+
+            $dateStr = $date->toDateString();
+            $dayCounts = $counts->get($dateStr, collect())->keyBy('status');
+
+            $c = (int) ($dayCounts->get('confirmed')->aggregate ?? 0);
+            $p = (int) ($dayCounts->get('pending')->aggregate ?? 0);
             
             // Generate some dummy data to make the chart look alive if it's empty
             if ($c == 0 && $p == 0) {
