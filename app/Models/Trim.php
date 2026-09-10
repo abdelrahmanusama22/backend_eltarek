@@ -29,6 +29,12 @@ class Trim extends Model
 
     protected static function booted()
     {
+        static::saving(function (Trim $trim) {
+            if ($trim->price_egp <= 0) {
+                $trim->active = false;
+            }
+        });
+
         $updateVehiclePrice = function (Trim $trim) {
             if ($trim->vehicle_id) {
                 $vehicle = Vehicle::find($trim->vehicle_id);
@@ -41,9 +47,18 @@ class Trim extends Model
             }
         };
 
-        static::saved($updateVehiclePrice);
-        static::deleted($updateVehiclePrice);
-        static::restored($updateVehiclePrice);
+        static::saved(function (Trim $trim) use ($updateVehiclePrice) {
+            $updateVehiclePrice($trim);
+            event(new \App\Events\CatalogUpdated());
+        });
+        static::deleted(function (Trim $trim) use ($updateVehiclePrice) {
+            $updateVehiclePrice($trim);
+            event(new \App\Events\CatalogUpdated());
+        });
+        static::restored(function (Trim $trim) use ($updateVehiclePrice) {
+            $updateVehiclePrice($trim);
+            event(new \App\Events\CatalogUpdated());
+        });
     }
 
     public function vehicle(): BelongsTo

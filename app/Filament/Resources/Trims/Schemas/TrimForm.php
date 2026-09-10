@@ -34,7 +34,13 @@ class TrimForm
                         TextInput::make('price_egp')
                             ->label('Official Price in EGP (السعر الرسمي بالجنيه)')
                             ->numeric()
-                            ->default(null),
+                            ->default(null)
+                            ->live(onBlur: true)
+                            ->afterStateUpdated(function ($set, $state) {
+                                if (empty($state) || $state <= 0) {
+                                    $set('active', false);
+                                }
+                            }),
                         TextInput::make('markup_percentage')
                             ->label('Markup Percentage (%)')
                             ->numeric()
@@ -147,8 +153,14 @@ class TrimForm
                             ->tabs([
                                 Tab::make('Tech (تكنولوجيا)')
                                     ->schema([
-                                        Repeater::make('specs.tech')
-                                            ->label('Tech Specs')
+                                        \Filament\Schemas\Components\Group::make()
+                                            ->schema([
+                                                TextInput::make('specs.tech.engine')->label('Engine')->default(null),
+                                                TextInput::make('specs.tech.hp')->label('Horsepower')->default(null),
+                                                TextInput::make('specs.tech.transmission')->label('Transmission')->default(null),
+                                            ])->columns(3),
+                                        Repeater::make('specs.tech.custom_tech')
+                                            ->label('Custom Tech Specs')
                                             ->schema([
                                                 TextInput::make('label')->required(),
                                                 TextInput::make('label_ar')->required(),
@@ -158,8 +170,13 @@ class TrimForm
                                     ]),
                                 Tab::make('Safety (أمان)')
                                     ->schema([
-                                        Repeater::make('specs.safety')
-                                            ->label('Safety Specs')
+                                        \Filament\Schemas\Components\Group::make()
+                                            ->schema([
+                                                TextInput::make('specs.safety.airbags')->label('Airbags')->default(null),
+                                                TextInput::make('specs.safety.abs_ebd')->label('ABS & EBD')->default(null),
+                                            ])->columns(2),
+                                        Repeater::make('specs.safety.custom_safety')
+                                            ->label('Custom Safety Specs')
                                             ->schema([
                                                 TextInput::make('label')->required(),
                                                 TextInput::make('label_ar')->required(),
@@ -169,8 +186,13 @@ class TrimForm
                                     ]),
                                 Tab::make('Interior (مقصورة)')
                                     ->schema([
-                                        Repeater::make('specs.int')
-                                            ->label('Interior Specs')
+                                        \Filament\Schemas\Components\Group::make()
+                                            ->schema([
+                                                TextInput::make('specs.interior.seats_material')->label('Seats Material')->default(null),
+                                                TextInput::make('specs.interior.screen_size')->label('Screen Size')->default(null),
+                                            ])->columns(2),
+                                        Repeater::make('specs.interior.custom_interior')
+                                            ->label('Custom Interior Specs')
                                             ->schema([
                                                 TextInput::make('label')->required(),
                                                 TextInput::make('label_ar')->required(),
@@ -180,8 +202,13 @@ class TrimForm
                                     ]),
                                 Tab::make('Exterior (خارجي)')
                                     ->schema([
-                                        Repeater::make('specs.ext')
-                                            ->label('Exterior Specs')
+                                        \Filament\Schemas\Components\Group::make()
+                                            ->schema([
+                                                TextInput::make('specs.exterior.wheels_size')->label('Wheels Size')->default(null),
+                                                TextInput::make('specs.exterior.sunroof')->label('Sunroof')->default(null),
+                                            ])->columns(2),
+                                        Repeater::make('specs.exterior.custom_exterior')
+                                            ->label('Custom Exterior Specs')
                                             ->schema([
                                                 TextInput::make('label')->required(),
                                                 TextInput::make('label_ar')->required(),

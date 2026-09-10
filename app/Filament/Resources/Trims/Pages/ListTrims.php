@@ -13,6 +13,8 @@ class ListTrims extends ListRecords
     protected function getHeaderActions(): array
     {
         return [
+            \App\Filament\Actions\ExcelImportAction::make('import')
+                ->importer(\App\Filament\Imports\TrimImporter::class),
             CreateAction::make(),
         ];
     }

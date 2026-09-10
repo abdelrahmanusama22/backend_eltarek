@@ -23,7 +23,9 @@ Route::match(['GET', 'HEAD', 'OPTIONS'], '/media/{path}', function ($path) {
     }
 
     return response()->file($realPath, [
-        'Access-Control-Allow-Origin' => '*',
+        'Access-Control-Allow-Origin'  => '*',
         'Access-Control-Allow-Methods' => 'GET, HEAD, OPTIONS',
+        'Cache-Control'                => 'public, max-age=31536000, immutable',
     ]);
-})->where('path', '.*');
+})->where('path', '.*')->withoutMiddleware(['web', \Illuminate\Session\Middleware\StartSession::class]);
+

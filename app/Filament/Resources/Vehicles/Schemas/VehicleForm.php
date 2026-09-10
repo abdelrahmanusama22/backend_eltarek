@@ -28,7 +28,15 @@ class VehicleForm
                         'Coupe'    => 'Coupe',
                     ])
                     ->required(),
-                TextInput::make('starting_price_egp')->required()->numeric(),
+                TextInput::make('starting_price_egp')
+                    ->required()
+                    ->numeric()
+                    ->live(onBlur: true)
+                    ->afterStateUpdated(function (string $operation, $state, \Filament\Forms\Set $set) {
+                        if (empty($state) || $state <= 0) {
+                            $set('active', false);
+                        }
+                    }),
                 FileUpload::make('image_url')
                     ->label('Vehicle Image')
                     ->image()

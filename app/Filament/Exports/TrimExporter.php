@@ -35,6 +35,19 @@ class TrimExporter extends Exporter
             ExportColumn::make('financing_notes')->label('Financing Notes'),
             ExportColumn::make('is_most_popular')->label('Most Popular'),
             ExportColumn::make('active')->label('Active'),
+            ExportColumn::make('vehicle.category')->label('Category'),
+            ExportColumn::make('vehicle.engine_summary')->label('Engine Summary'),
+            ExportColumn::make('subtitle')->label('Subtitle'),
+            ExportColumn::make('has_360_view')->label('Has 360 View'),
+            ExportColumn::make('specs')
+                ->label('Specifications')
+                ->state(fn (Trim $record) => $record->specs ? json_encode($record->specs, JSON_UNESCAPED_UNICODE) : null),
+            ExportColumn::make('highlights')
+                ->label('Highlights')
+                ->state(fn (Trim $record) => $record->highlights ? json_encode($record->highlights, JSON_UNESCAPED_UNICODE) : null),
+            ExportColumn::make('metrics')
+                ->label('Metrics')
+                ->state(fn (Trim $record) => $record->metrics ? json_encode($record->metrics, JSON_UNESCAPED_UNICODE) : null),
         ];
     }
 

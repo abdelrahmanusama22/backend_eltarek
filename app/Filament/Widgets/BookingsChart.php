@@ -11,6 +11,11 @@ class BookingsChart extends ChartWidget
     protected static ?int $sort = 2;
     protected int | string | array $columnSpan = 2; // Span 2 of 3 columns
 
+    public function getMaxHeight(): ?string
+    {
+        return '300px';
+    }
+
     public function getHeading(): ?string
     {
         return 'Booking Activity';

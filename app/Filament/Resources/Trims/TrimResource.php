@@ -54,7 +54,6 @@ class TrimResource extends Resource
             'index' => ListTrims::route('/'),
             'create' => CreateTrim::route('/create'),
             'edit' => EditTrim::route('/{record}/edit'),
-            'import' => \App\Filament\Resources\Trims\Pages\CatalogImportPage::route('/import'),
         ];
     }
 }

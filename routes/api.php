@@ -30,10 +30,11 @@ Route::prefix('v1')->group(function () {
 
     // -------------------------------------------------------------- public
     Route::get('bootstrap', BootstrapController::class);
-    Route::get('home', HomeController::class);
+    Route::get('/home', [HomeController::class, 'index']);
 
     Route::get('vehicles', [VehicleController::class, 'index']);
     Route::get('vehicles/search', [VehicleController::class, 'search']);
+    Route::get('vehicles/{vehicle}', [VehicleController::class, 'show']);
     Route::get('vehicles/{vehicle}/trims', [VehicleController::class, 'trims']);
     Route::get('trims/{trim}', [VehicleController::class, 'trimDetail']);
 
@@ -76,4 +77,9 @@ Route::prefix('v1')->group(function () {
         Route::get('notifications', [NotificationController::class, 'index']);
         Route::post('notifications/mark-all-read', [NotificationController::class, 'markAllRead']);
     });
+});
+
+Route::post('/webhook/trigger-catalog-sync', function () {
+    \Illuminate\Support\Facades\Artisan::call('catalog:sync');
+    return response()->json(['success' => true, 'message' => 'Sync started']);
 });

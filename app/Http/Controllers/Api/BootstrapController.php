@@ -47,8 +47,10 @@ class BootstrapController extends ApiController
             ],
             'cities' => City::orderBy('sort')->get()->map->toApi(),
             'brands' => Brand::where('active', true)->orderBy('sort')->get()->map->toApi(),
-            'vehicles' => Vehicle::with('trims')->where('active', true)->orderBy('sort')->get()->map->toApi(),
-            'trims' => Trim::where('active', true)->get()->map->toApi(),
+            'vehicles' => Vehicle::with('trims')->where('active', true)->whereBetween('year', [now()->year - 1, now()->year + 1])->orderBy('sort')->get()->map->toApi(),
+            'trims' => Trim::where('active', true)->whereHas('vehicle', function($q) {
+                $q->whereBetween('year', [now()->year - 1, now()->year + 1]);
+            })->get()->map->toApi(),
             'branches' => Branch::where('active', true)->get()->map->toApi(),
         ];
 

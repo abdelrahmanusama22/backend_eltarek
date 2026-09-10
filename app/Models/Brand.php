@@ -17,9 +17,19 @@ class Brand extends Model
 
     protected $casts = ['active' => 'boolean'];
 
+    protected static function booted()
+    {
+        static::saved(function () {
+            event(new \App\Events\CatalogUpdated());
+        });
+        static::deleted(function () {
+            event(new \App\Events\CatalogUpdated());
+        });
+    }
+
     public function vehicles(): HasMany
     {
-        return $this->hasMany(Vehicle::class)->where('active', true)->orderBy('sort');
+        return $this->hasMany(Vehicle::class)->where('active', true)->where('starting_price_egp', '>', 0)->orderBy('sort');
     }
 
     public function getResolvedLogoUrlAttribute(): ?string

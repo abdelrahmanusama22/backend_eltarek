@@ -315,7 +315,6 @@ $fleetTrims = \App\Models\Trim::where('in_test_drive_fleet', true)
         </div>
         <div class="kpi-num">{{ $todayBookings }}</div>
         <div class="kpi-lbl">Today&apos;s Bookings</div>
-        <canvas class="kpi-spark" id="sp1"></canvas>
     </div>
 
     <div class="kpi">
@@ -325,7 +324,6 @@ $fleetTrims = \App\Models\Trim::where('in_test_drive_fleet', true)
         </div>
         <div class="kpi-num">{{ number_format($totalCustomers) }}</div>
         <div class="kpi-lbl">Total Customers</div>
-        <canvas class="kpi-spark" id="sp2"></canvas>
     </div>
 
     <div class="kpi">
@@ -335,7 +333,6 @@ $fleetTrims = \App\Models\Trim::where('in_test_drive_fleet', true)
         </div>
         <div class="kpi-num">{{ $activeVehicles }}</div>
         <div class="kpi-lbl">Active Vehicles</div>
-        <canvas class="kpi-spark" id="sp3"></canvas>
     </div>
 
     <div class="kpi">
@@ -349,7 +346,6 @@ $fleetTrims = \App\Models\Trim::where('in_test_drive_fleet', true)
         </div>
         <div class="kpi-num">{{ $pendingBookings }}</div>
         <div class="kpi-lbl">Pending Approvals</div>
-        <canvas class="kpi-spark" id="sp4"></canvas>
     </div>
 
 </div>
@@ -455,11 +451,11 @@ $fleetTrims = \App\Models\Trim::where('in_test_drive_fleet', true)
         @foreach($recentBookings as $b)
         @php
             $ref   = $b->reference ?? ('#BK-'.str_pad($b->id + 9000, 4, '0', STR_PAD_LEFT));
-            $name  = $b->user->name ?? 'Unknown';
+            $name  = $b->user?->name ?? 'Unknown';
             $init  = strtoupper(substr($name, 0, 1));
-            $model = optional($b->trim->vehicle)->model ?? '&mdash;';
-            $trim  = $b->trim->name ?? '';
-            $branch= $b->branch->name ?? '&mdash;';
+            $model = $b->trim?->vehicle?->model ?? '&mdash;';
+            $trim  = $b->trim?->name ?? '';
+            $branch= $b->branch?->name ?? '&mdash;';
             $dt    = $b->date ? \Carbon\Carbon::parse($b->date)->format('M d') : '';
             $time  = $b->time ?? '';
             $sCls  = match($b->status) {

@@ -112,7 +112,7 @@
                     @endif
                     @style([
                         'width: 100%',
-                        'height: 100%; max-height: 100%' => ! $hasMaxHeight,
+                        'height: 300px; max-height: 300px' => ! $hasMaxHeight,
                         ('max-height: ' . e($maxHeight)) => $hasMaxHeight,
                     ])
                 ></canvas>

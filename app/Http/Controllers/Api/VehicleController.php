@@ -17,7 +17,7 @@ class VehicleController extends ApiController
             'sort' => ['nullable', 'in:price_asc,price_desc,newest'],
         ]);
 
-        $query = Vehicle::with(['brand', 'trims'])->where('active', true);
+        $query = Vehicle::with(['brand', 'trims'])->where('active', true)->whereBetween('year', [now()->year - 1, now()->year + 1]);
 
         if ($brandId = $request->integer('brand_id')) {
             $query->where('brand_id', $brandId);
@@ -63,6 +63,7 @@ class VehicleController extends ApiController
 
         $vehicles = Vehicle::with(['brand', 'trims'])
             ->where('active', true)
+            ->whereBetween('year', [now()->year - 1, now()->year + 1])
             ->where(function ($query) use ($escapedQ) {
                 $query->where('model', 'like', "%{$escapedQ}%")
                     ->orWhere('model_ar', 'like', "%{$escapedQ}%")
@@ -134,6 +135,13 @@ class VehicleController extends ApiController
         ]);
     }
 
+    /** GET /vehicles/{vehicle} */
+    public function show($id): JsonResponse
+    {
+        $vehicle = Vehicle::with(['brand', 'trims'])->findOrFail($id);
+        return $this->ok($this->vehicleListItem($vehicle));
+    }
+
     private function vehicleListItem(Vehicle $vehicle): array
     {
         return array_merge($vehicle->toApi(), [
@@ -141,6 +149,12 @@ class VehicleController extends ApiController
             'trims_count' => $vehicle->trims->count(),
             'primary_trim_id' => $vehicle->trims->first()?->id,
             'availability' => 'available',
+            'trims' => $vehicle->trims->map(fn($trim) => [
+                'id' => $trim->id,
+                'name' => $trim->name,
+                'price_egp' => $trim->price_egp,
+                'active' => $trim->active,
+            ])->toArray(),
         ]);
     }
 }

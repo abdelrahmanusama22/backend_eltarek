@@ -31,6 +31,8 @@ class ProcessCatalogImportJob implements ShouldQueue
         $reader->open($this->filePath);
         
         $importedCount = 0;
+        $newVehiclesCount = 0;
+        $newTrimsCount = 0;
         
         foreach ($reader->getSheetIterator() as $sheet) {
             $sheetName = $sheet->getName();
@@ -100,20 +102,14 @@ class ProcessCatalogImportJob implements ShouldQueue
                     ['brand_id' => $brand->id, 'model' => $modelName, 'year' => $year],
                     ['model_ar' => '', 'category' => 'Other', 'active' => true, 'sort' => 0, 'starting_price_egp' => 0]
                 );
+                
+                if ($vehicle->wasRecentlyCreated) {
+                    $newVehiclesCount++;
+                }
 
                 // 3. Upsert Trim
                 $trimData = [
                     'active' => true,
-                    'name_ar' => '',
-                    'highlights' => [],
-                    'specs' => ['tech' => [], 'safety' => [], 'int' => [], 'ext' => []],
-                    'metrics' => [
-                        'hp' => ['display' => '', 'score' => 0],
-                        'accel' => ['display' => '', 'score' => 0],
-                        'speed' => ['display' => '', 'score' => 0]
-                    ],
-                    'gallery' => [],
-                    'price_egp' => 0
                 ];
                 
                 if (isset($rowData['car id'])) {
@@ -174,10 +170,33 @@ class ProcessCatalogImportJob implements ShouldQueue
                     $trimData['price_9pct'] = (int) preg_replace('/[^0-9]/', '', (string)$p9);
                 }
 
-                Trim::updateOrCreate(
-                    ['vehicle_id' => $vehicle->id, 'name' => $trimName],
-                    $trimData
-                );
+                $existingTrim = Trim::where('vehicle_id', $vehicle->id)->where('name', $trimName)->first();
+                if ($existingTrim) {
+                    $existingTrim->update($trimData);
+                } else {
+                    $trimData['name_ar'] = '';
+                    $trimData['highlights'] = [];
+                    $trimData['specs'] = [
+                        'tech' => ['engine' => '', 'hp' => '', 'transmission' => ''], 
+                        'safety' => ['airbags' => '', 'abs_ebd' => ''], 
+                        'interior' => ['seats_material' => '', 'screen_size' => ''], 
+                        'exterior' => ['wheels_size' => '', 'sunroof' => '']
+                    ];
+                    $trimData['metrics'] = [
+                        'hp' => ['display' => '', 'score' => 0],
+                        'accel' => ['display' => '', 'score' => 0],
+                        'speed' => ['display' => '', 'score' => 0]
+                    ];
+                    $trimData['gallery'] = [];
+                    $trimData['price_egp'] = $trimData['price_egp'] ?? 0;
+                    
+                    Trim::create(array_merge([
+                        'vehicle_id' => $vehicle->id,
+                        'name' => $trimName,
+                    ], $trimData));
+                    
+                    $newTrimsCount++;
+                }
                 
                 $importedCount++;
             }
@@ -192,6 +211,17 @@ class ProcessCatalogImportJob implements ShouldQueue
                 ->body("Successfully imported/updated {$importedCount} trims.")
                 ->success()
                 ->sendToDatabase($user);
+        }
+        
+        if ($newVehiclesCount > 0 || $newTrimsCount > 0) {
+            $admins = \App\Models\User::where('is_admin', true)->get();
+            foreach ($admins as $admin) {
+                Notification::make()
+                    ->title('New Vehicles Synced!')
+                    ->body("{$newTrimsCount} new trims and {$newVehiclesCount} new vehicles were automatically added from the Old System. Please update their specs and images.")
+                    ->warning()
+                    ->sendToDatabase($admin);
+            }
         }
     }
 }

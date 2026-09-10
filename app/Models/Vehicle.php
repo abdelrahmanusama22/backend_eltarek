@@ -18,6 +18,22 @@ class Vehicle extends Model
 
     protected $casts = ['active' => 'boolean'];
 
+    protected static function booted()
+    {
+        static::saving(function ($vehicle) {
+            if ($vehicle->starting_price_egp <= 0) {
+                $vehicle->active = false;
+            }
+        });
+
+        static::saved(function () {
+            event(new \App\Events\CatalogUpdated());
+        });
+        static::deleted(function () {
+            event(new \App\Events\CatalogUpdated());
+        });
+    }
+
     public function brand(): BelongsTo
     {
         return $this->belongsTo(Brand::class);
@@ -25,7 +41,7 @@ class Vehicle extends Model
 
     public function trims(): HasMany
     {
-        return $this->hasMany(Trim::class)->where('active', true)->orderBy('price_egp');
+        return $this->hasMany(Trim::class)->where('active', true)->where('price_egp', '>', 0)->orderBy('price_egp');
     }
 
     /**
@@ -57,16 +73,19 @@ class Vehicle extends Model
             'engine_summary'      => $this->engine_summary,
             'monthly_from_egp'    => $this->monthly_from_egp,
             'badge'               => $this->badge,
+            'trims'               => $this->relationLoaded('trims') 
+                                        ? $this->trims->map->toApi()->values()->toArray() 
+                                        : [],
         ];
     }
 
-    public function getStartingPrice(): int
+  public function getStartingPrice(): int
     {
         if ($this->relationLoaded('trims') && $this->trims->count() > 0) {
-            return (int) $this->trims->min('executive_price');
+            return (int) $this->trims->min('price_egp');
         }
         
-        $min = $this->trims()->min(\Illuminate\Support\Facades\DB::raw('price_egp * (1 + COALESCE(markup_percentage, 5) / 100)'));
+        $min = $this->trims()->min('price_egp');
         return (int) ($min ?? $this->starting_price_egp);
     }
 }
