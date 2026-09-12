@@ -5,6 +5,8 @@ namespace App\Filament\Resources\LoyaltyRules\Tables;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteBulkAction;
 use Filament\Actions\EditAction;
+use Filament\Tables\Columns\IconColumn;
+use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
 
 class LoyaltyRulesTable
@@ -13,17 +15,17 @@ class LoyaltyRulesTable
     {
         return $table
             ->columns([
-                \Filament\Tables\Columns\TextColumn::make('name')
+                TextColumn::make('name')
                     ->searchable()
                     ->sortable(),
-                \Filament\Tables\Columns\TextColumn::make('action')
+                TextColumn::make('action')
                     ->badge()
                     ->color('primary')
                     ->sortable(),
-                \Filament\Tables\Columns\TextColumn::make('points_awarded')
+                TextColumn::make('points_awarded')
                     ->numeric()
                     ->sortable(),
-                \Filament\Tables\Columns\IconColumn::make('is_active')
+                IconColumn::make('is_active')
                     ->boolean()
                     ->sortable(),
             ])

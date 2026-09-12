@@ -2,9 +2,10 @@
 
 namespace App\Filament\Resources\Users\Schemas;
 
+use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
-use Filament\Forms\Components\Select;
+use Filament\Forms\Components\FileUpload;
 use Filament\Schemas\Schema;
 
 class UserForm
@@ -13,6 +14,13 @@ class UserForm
     {
         return $schema
             ->components([
+                FileUpload::make('avatar_url')
+                    ->label('Profile Photo')
+                    ->image()
+                    ->disk('public')
+                    ->directory('avatars')
+                    ->imageEditor()
+                    ->maxSize(5120),
                 TextInput::make('name')
                     ->default(null),
                 TextInput::make('phone')

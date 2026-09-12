@@ -7,6 +7,7 @@ use App\Filament\Resources\GarageCars\Pages\EditGarageCar;
 use App\Filament\Resources\GarageCars\Pages\ListGarageCars;
 use App\Filament\Resources\GarageCars\Schemas\GarageCarForm;
 use App\Filament\Resources\GarageCars\Tables\GarageCarsTable;
+use App\Filament\Resources\GarageCars\RelationManagers\ServiceRecordsRelationManager;
 use App\Models\GarageCar;
 use BackedEnum;
 use Filament\Resources\Resource;
@@ -25,9 +26,6 @@ class GarageCarResource extends Resource
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedWrenchScrewdriver;
 
-
-
-
     public static function form(Schema $schema): Schema
     {
         return GarageCarForm::configure($schema);
@@ -40,9 +38,7 @@ class GarageCarResource extends Resource
 
     public static function getRelations(): array
     {
-        return [
-            //
-        ];
+        return [ServiceRecordsRelationManager::class];
     }
 
     public static function getPages(): array

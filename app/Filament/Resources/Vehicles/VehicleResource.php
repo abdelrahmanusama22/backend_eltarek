@@ -20,7 +20,6 @@ class VehicleResource extends Resource
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedTruck;
 
-
     public static function getNavigationGroup(): ?string
     {
         return 'Catalog Management';

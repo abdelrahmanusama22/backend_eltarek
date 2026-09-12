@@ -2,14 +2,15 @@
 
 namespace App\Filament\Widgets;
 
-use Filament\Widgets\ChartWidget;
 use App\Models\Booking;
 use Carbon\Carbon;
+use Filament\Widgets\ChartWidget;
 
 class BookingsChart extends ChartWidget
 {
     protected static ?int $sort = 2;
-    protected int | string | array $columnSpan = 2; // Span 2 of 3 columns
+
+    protected int|string|array $columnSpan = 2; // Span 2 of 3 columns
 
     public function getMaxHeight(): ?string
     {
@@ -58,13 +59,7 @@ class BookingsChart extends ChartWidget
 
             $c = (int) ($dayCounts->get('confirmed')->aggregate ?? 0);
             $p = (int) ($dayCounts->get('pending')->aggregate ?? 0);
-            
-            // Generate some dummy data to make the chart look alive if it's empty
-            if ($c == 0 && $p == 0) {
-                $c = rand(60, 150);
-                $p = rand(20, 60);
-            }
-            
+
             $confirmed[] = $c;
             $pending[] = $p;
         }
@@ -96,7 +91,7 @@ class BookingsChart extends ChartWidget
     {
         return 'line';
     }
-    
+
     protected function getOptions(): array
     {
         return [

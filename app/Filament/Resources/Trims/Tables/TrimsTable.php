@@ -2,26 +2,24 @@
 
 namespace App\Filament\Resources\Trims\Tables;
 
-use Filament\Tables\Table;
+use App\Filament\Exports\TrimExporter;
+use App\Models\Trim;
+use App\Models\Vehicle;
+use Filament\Actions\BulkAction;
+use Filament\Actions\BulkActionGroup;
+use Filament\Actions\DeleteAction;
+use Filament\Actions\DeleteBulkAction;
+use Filament\Actions\EditAction;
+use Filament\Actions\ExportAction;
+use Filament\Forms\Components\TextInput;
 use Filament\Tables\Columns\IconColumn;
 use Filament\Tables\Columns\TextColumn;
-use Filament\Tables\Filters\TrashedFilter;
-use Filament\Tables\Filters\TernaryFilter;
 use Filament\Tables\Filters\SelectFilter;
-use Filament\Actions\EditAction;
-use Filament\Actions\DeleteAction;
-use Filament\Actions\BulkActionGroup;
-use Filament\Actions\DeleteBulkAction;
-use Filament\Actions\BulkAction;
-use Filament\Actions\ExportAction;
-use Filament\Actions\Action;
-use Filament\Forms\Components\TextInput;
-use App\Models\Vehicle;
-use App\Models\Trim;
+use Filament\Tables\Filters\TernaryFilter;
+use Filament\Tables\Filters\TrashedFilter;
+use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
-use App\Filament\Exports\TrimExporter;
-use App\Filament\Resources\Trims\TrimResource;
 
 class TrimsTable
 {
@@ -84,6 +82,7 @@ class TrimsTable
                     ->options(function () {
                         $years = Vehicle::select('year')->distinct()->pluck('year', 'year')->toArray();
                         arsort($years);
+
                         return $years;
                     })
                     ->query(function (Builder $query, array $data) {
@@ -108,7 +107,7 @@ class TrimsTable
                                 ->label('Markup Percentage (%)')
                                 ->numeric()
                                 ->required()
-                                ->default(5)
+                                ->default(5),
                         ])
                         ->action(function (Collection $records, array $data): void {
                             foreach ($records as $record) {

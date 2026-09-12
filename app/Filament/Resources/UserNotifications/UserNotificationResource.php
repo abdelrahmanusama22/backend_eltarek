@@ -25,9 +25,6 @@ class UserNotificationResource extends Resource
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedBell;
 
-
-
-
     public static function form(Schema $schema): Schema
     {
         return UserNotificationForm::configure($schema);

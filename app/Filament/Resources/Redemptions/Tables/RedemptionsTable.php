@@ -2,9 +2,8 @@
 
 namespace App\Filament\Resources\Redemptions\Tables;
 
-use Filament\Actions\BulkActionGroup;
-use Filament\Actions\DeleteBulkAction;
-use Filament\Actions\EditAction;
+use Filament\Actions\Action;
+use Filament\Notifications\Notification;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
 
@@ -30,6 +29,8 @@ class RedemptionsTable
                 TextColumn::make('valid_until')
                     ->date()
                     ->sortable(),
+                TextColumn::make('effective_status')->label('Status')->badge()->color(fn ($state)=>match($state){'active'=>'success','used'=>'info','cancelled'=>'danger',default=>'warning'}),
+                TextColumn::make('used_at')->dateTime()->placeholder('—'),
                 TextColumn::make('created_at')
                     ->dateTime()
                     ->sortable()
@@ -43,12 +44,9 @@ class RedemptionsTable
                 //
             ])
             ->recordActions([
-                EditAction::make(),
-            ])
-            ->toolbarActions([
-                BulkActionGroup::make([
-                    DeleteBulkAction::make(),
-                ]),
+                Action::make('mark_used')->label('Mark used')->icon('heroicon-o-check-circle')->color('success')->requiresConfirmation()
+                    ->visible(fn ($record)=>$record->effective_status === 'active')
+                    ->action(function ($record) { $record->update(['status'=>'used','used_at'=>now(),'used_by'=>auth()->id()]); Notification::make()->title('Redemption marked as used')->success()->send(); }),
             ]);
     }
 }

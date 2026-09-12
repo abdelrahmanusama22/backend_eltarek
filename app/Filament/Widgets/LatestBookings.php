@@ -2,16 +2,19 @@
 
 namespace App\Filament\Widgets;
 
+use App\Models\Booking;
+use Filament\Actions\Action;
 use Filament\Tables;
 use Filament\Tables\Table;
 use Filament\Widgets\TableWidget as BaseWidget;
-use App\Models\Booking;
 
 class LatestBookings extends BaseWidget
 {
     protected static ?string $heading = 'Recent Bookings';
+
     protected static ?int $sort = 6;
-    protected int | string | array $columnSpan = 'full';
+
+    protected int|string|array $columnSpan = 'full';
 
     public function table(Table $table): Table
     {
@@ -22,7 +25,7 @@ class LatestBookings extends BaseWidget
             ->columns([
                 Tables\Columns\TextColumn::make('id')
                     ->label('ID')
-                    ->formatStateUsing(fn ($state) => '#BK-' . (9000 + $state)),
+                    ->formatStateUsing(fn ($state) => '#BK-'.(9000 + $state)),
                 Tables\Columns\TextColumn::make('user.name')
                     ->label('CUSTOMER')
                     ->weight('bold'),
@@ -44,7 +47,7 @@ class LatestBookings extends BaseWidget
                     }),
             ])
             ->recordActions([
-                \Filament\Actions\Action::make('view')
+                Action::make('view')
                     ->url(fn (Booking $record): string => route('filament.admin.resources.bookings.edit', $record))
                     ->icon('heroicon-m-ellipsis-vertical')
                     ->label(''),

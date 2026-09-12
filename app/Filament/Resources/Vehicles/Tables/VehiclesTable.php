@@ -2,21 +2,22 @@
 
 namespace App\Filament\Resources\Vehicles\Tables;
 
+use App\Filament\Exports\VehicleExporter;
+use App\Filament\Resources\Trims\TrimResource;
 use App\Models\Vehicle;
-use Filament\Tables\Table;
-use Filament\Tables\Columns\IconColumn;
-use Filament\Tables\Columns\ImageColumn;
-use Filament\Tables\Columns\TextColumn;
-use Filament\Tables\Columns\SelectColumn;
-use Filament\Tables\Filters\SelectFilter;
-use Filament\Tables\Filters\TrashedFilter;
 use Filament\Actions\Action;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteAction;
 use Filament\Actions\DeleteBulkAction;
 use Filament\Actions\EditAction;
 use Filament\Actions\ExportAction;
-use App\Filament\Exports\VehicleExporter;
+use Filament\Tables\Columns\IconColumn;
+use Filament\Tables\Columns\ImageColumn;
+use Filament\Tables\Columns\SelectColumn;
+use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Filters\SelectFilter;
+use Filament\Tables\Filters\TrashedFilter;
+use Filament\Tables\Table;
 
 class VehiclesTable
 {
@@ -76,6 +77,7 @@ class VehiclesTable
                     ->options(function () {
                         $years = Vehicle::select('year')->distinct()->pluck('year', 'year')->toArray();
                         arsort($years);
+
                         return $years;
                     })
                     ->label('Year'),
@@ -107,7 +109,7 @@ class VehiclesTable
                 Action::make('import')
                     ->label('Import / Update Catalog')
                     ->icon('heroicon-o-arrow-down-tray')
-                    ->url(fn () => \App\Filament\Resources\Trims\TrimResource::getUrl('import')),
+                    ->url(fn () => TrimResource::getUrl('index')),
             ]);
     }
 }

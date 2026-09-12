@@ -9,7 +9,7 @@ class City extends Model
 {
     public $timestamps = false;
 
-    protected $guarded = [];
+    protected $fillable = ['name', 'name_ar', 'sort'];
 
     public function toApi(): array
     {

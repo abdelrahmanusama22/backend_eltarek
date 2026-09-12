@@ -5,11 +5,11 @@ namespace App\Filament\Resources\Branches\Tables;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteBulkAction;
 use Filament\Actions\EditAction;
-use Filament\Tables\Columns\ToggleColumn;
-use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Columns\ImageColumn;
-use Filament\Tables\Table;
+use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Columns\ToggleColumn;
 use Filament\Tables\Filters\TrashedFilter;
+use Filament\Tables\Table;
 
 class BranchesTable
 {
@@ -38,7 +38,7 @@ class BranchesTable
                     ->label('مواعيد العمل')
                     ->searchable(),
                 ToggleColumn::make('is_open')
-                    ->label('مفتوح الآن'),
+                    ->label('حالة احتياطية'),
                 ToggleColumn::make('active')
                     ->label('مفعل (يظهر بالتطبيق)'),
                 TextColumn::make('lat')

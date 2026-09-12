@@ -2,10 +2,10 @@
 
 namespace App\Console\Commands;
 
+use App\Models\Trim;
+use App\Models\Vehicle;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
-use App\Models\Vehicle;
-use App\Models\Trim;
 
 class CleanupOldVehicles extends Command
 {
@@ -46,7 +46,7 @@ class CleanupOldVehicles extends Command
                 $vehicles = Vehicle::where('year', '<', 2025)->orWhere('starting_price_egp', '<=', 0)->get();
                 $vehicleIds = $vehicles->pluck('id')->toArray();
 
-                if (!empty($vehicleIds)) {
+                if (! empty($vehicleIds)) {
                     // 3. Delete associated trims
                     $associatedTrimsDeleted = Trim::whereIn('vehicle_id', $vehicleIds)->forceDelete();
                     $totalTrimsDeleted += $associatedTrimsDeleted;
@@ -65,7 +65,7 @@ class CleanupOldVehicles extends Command
                 // 5. Clean orphaned vehicles (vehicles with 0 trims)
                 $orphanedVehicles = Vehicle::doesntHave('trims')->get();
                 $orphanedIds = $orphanedVehicles->pluck('id')->toArray();
-                if (!empty($orphanedIds)) {
+                if (! empty($orphanedIds)) {
                     $orphanedDeleted = Vehicle::whereIn('id', $orphanedIds)->forceDelete();
                     $totalVehiclesDeleted += $orphanedDeleted;
                     if ($orphanedDeleted > 0) {
@@ -77,7 +77,7 @@ class CleanupOldVehicles extends Command
                 $this->info("Cleanup complete! Total deleted: {$totalVehiclesDeleted} vehicles, {$totalTrimsDeleted} trims.");
             });
         } catch (\Exception $e) {
-            $this->error('An error occurred during cleanup: ' . $e->getMessage());
+            $this->error('An error occurred during cleanup: '.$e->getMessage());
         }
     }
 }

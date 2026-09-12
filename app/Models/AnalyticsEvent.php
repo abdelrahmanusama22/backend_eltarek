@@ -9,7 +9,10 @@ class AnalyticsEvent extends Model
 {
     public $timestamps = false;
 
-    protected $guarded = [];
+    protected $fillable = [
+        'user_id', 'event_name', 'category', 'properties', 'session_id',
+        'device_info', 'ip_address', 'created_at',
+    ];
 
     protected $casts = [
         'properties' => 'array',

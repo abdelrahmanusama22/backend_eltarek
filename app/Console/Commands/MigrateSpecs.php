@@ -2,8 +2,8 @@
 
 namespace App\Console\Commands;
 
-use Illuminate\Console\Command;
 use App\Models\Trim;
+use Illuminate\Console\Command;
 
 class MigrateSpecs extends Command
 {
@@ -28,35 +28,37 @@ class MigrateSpecs extends Command
     {
         $trims = Trim::all();
         $count = 0;
-        
+
         foreach ($trims as $trim) {
             $specs = $trim->specs;
-            if (!$specs || !is_array($specs)) continue;
-            
+            if (! $specs || ! is_array($specs)) {
+                continue;
+            }
+
             $newSpecs = [
                 'tech' => [
                     'engine' => null,
                     'hp' => null,
                     'transmission' => null,
-                    'custom_tech' => []
+                    'custom_tech' => [],
                 ],
                 'safety' => [
                     'airbags' => null,
                     'abs_ebd' => null,
-                    'custom_safety' => []
+                    'custom_safety' => [],
                 ],
                 'interior' => [
                     'seats_material' => null,
                     'screen_size' => null,
-                    'custom_interior' => []
+                    'custom_interior' => [],
                 ],
                 'exterior' => [
                     'wheels_size' => null,
                     'sunroof' => null,
-                    'custom_exterior' => []
-                ]
+                    'custom_exterior' => [],
+                ],
             ];
-            
+
             // Map Tech
             if (isset($specs['tech']) && is_array($specs['tech'])) {
                 // If it's already migrated (has custom_tech), skip to avoid double mapping, or handle gracefully
@@ -77,7 +79,7 @@ class MigrateSpecs extends Command
                     }
                 }
             }
-            
+
             // Map Safety
             if (isset($specs['safety']) && is_array($specs['safety'])) {
                 if (isset($specs['safety']['custom_safety'])) {
@@ -95,7 +97,7 @@ class MigrateSpecs extends Command
                     }
                 }
             }
-            
+
             // Map Interior (old was 'int')
             $oldInt = $specs['int'] ?? ($specs['interior'] ?? []);
             if (is_array($oldInt)) {
@@ -114,7 +116,7 @@ class MigrateSpecs extends Command
                     }
                 }
             }
-            
+
             // Map Exterior (old was 'ext')
             $oldExt = $specs['ext'] ?? ($specs['exterior'] ?? []);
             if (is_array($oldExt)) {
@@ -133,17 +135,18 @@ class MigrateSpecs extends Command
                     }
                 }
             }
-            
+
             $trim->specs = $newSpecs;
             $trim->saveQuietly();
             $count++;
         }
-        
+
         $this->info("Successfully migrated specs for {$count} trims.");
     }
-    
+
     // Helper to concatenate if multiple items match
-    private function cloneValue($existing, $new) {
-        return $existing ? $existing . ' + ' . $new : $new;
+    private function cloneValue($existing, $new)
+    {
+        return $existing ? $existing.' + '.$new : $new;
     }
 }

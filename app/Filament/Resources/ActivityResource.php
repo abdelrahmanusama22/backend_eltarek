@@ -2,23 +2,24 @@
 
 namespace App\Filament\Resources;
 
-use Spatie\Activitylog\Models\Activity;
 use App\Filament\Resources\ActivityResource\Pages;
 use BackedEnum;
-use Filament\Schemas\Schema;
-use Filament\Resources\Resource;
-use Filament\Tables\Table;
-use Filament\Tables\Columns\TextColumn;
 use Filament\Forms\Components\KeyValue;
 use Filament\Forms\Components\TextInput;
+use Filament\Resources\Resource;
+use Filament\Schemas\Schema;
+use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Table;
+use Spatie\Activitylog\Models\Activity;
 
 class ActivityResource extends Resource
 {
     protected static ?string $model = Activity::class;
 
     protected static string|BackedEnum|null $navigationIcon = 'heroicon-o-clock';
-    
+
     protected static ?string $modelLabel = 'Activity Log';
+
     protected static ?string $pluralModelLabel = 'Activity Logs';
 
     public static function getNavigationGroup(): ?string

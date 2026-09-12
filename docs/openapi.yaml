@@ -1,0 +1,160 @@
+openapi: 3.1.0
+info:
+  title: El Tarek Mobile API
+  version: 1.0.0
+servers:
+  - url: /api/v1
+security: []
+paths:
+  /app-config:
+    get:
+      operationId: getAppConfig
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+  /catalog/version:
+    get:
+      operationId: getCatalogVersion
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+  /catalog/brands:
+    get:
+      operationId: listBrands
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+  /catalog/vehicles:
+    get:
+      operationId: listVehicles
+      parameters:
+        - $ref: '#/components/parameters/Cursor'
+        - $ref: '#/components/parameters/Limit'
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+  /catalog/trims:
+    get:
+      operationId: listTrims
+      parameters:
+        - $ref: '#/components/parameters/Cursor'
+        - $ref: '#/components/parameters/Limit'
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+  /auth/send-otp:
+    post:
+      operationId: sendOtp
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [phone]
+              properties: { phone: { type: string } }
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        '422': { $ref: '#/components/responses/Error' }
+        '429': { $ref: '#/components/responses/Error' }
+  /auth/verify-otp:
+    post:
+      operationId: verifyOtp
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [phone, otp]
+              properties:
+                phone: { type: string }
+                otp: { type: string }
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        '400': { $ref: '#/components/responses/Error' }
+  /test-drives:
+    post:
+      operationId: createTestDrive
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [trim_id, branch_id, date, time]
+              properties:
+                trim_id: { type: integer }
+                branch_id: { type: integer }
+                date: { type: string, format: date }
+                time: { type: string }
+                day_label: { type: string }
+      responses:
+        '201': { $ref: '#/components/responses/Success' }
+        '409': { $ref: '#/components/responses/Error' }
+        '422': { $ref: '#/components/responses/Error' }
+  /profile/rewards/redeem:
+    post:
+      operationId: redeemReward
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      responses:
+        '200': { $ref: '#/components/responses/Success' }
+        '409': { $ref: '#/components/responses/Error' }
+components:
+  securitySchemes:
+    bearerAuth: { type: http, scheme: bearer }
+  parameters:
+    Cursor:
+      name: cursor
+      in: query
+      schema: { type: string }
+    Limit:
+      name: limit
+      in: query
+      schema: { type: integer, minimum: 10, maximum: 200 }
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: true
+      schema: { type: string, minLength: 16, maxLength: 100 }
+  schemas:
+    Meta:
+      type: object
+      required: [request_id, api_version]
+      properties:
+        request_id: { type: string }
+        api_version: { type: string, const: v1 }
+        next_cursor: { type: [string, 'null'] }
+        has_more: { type: boolean }
+    ErrorBody:
+      type: object
+      required: [code, message, request_id]
+      properties:
+        code: { type: string }
+        message: { type: string }
+        fields: { type: [object, 'null'] }
+        request_id: { type: [string, 'null'] }
+    Envelope:
+      type: object
+      required: [success, data, meta, error]
+      properties:
+        success: { type: boolean }
+        data: {}
+        meta: { $ref: '#/components/schemas/Meta' }
+        error:
+          oneOf:
+            - { $ref: '#/components/schemas/ErrorBody' }
+            - { type: 'null' }
+  responses:
+    Success:
+      description: Successful response
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Envelope' }
+    Error:
+      description: Structured error response
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Envelope' }

@@ -21,9 +21,7 @@ use Illuminate\Support\Facades\Log;
  */
 class SmsMisrService
 {
-    public function __construct(private readonly array $config)
-    {
-    }
+    public function __construct(private readonly array $config) {}
 
     public static function make(): self
     {

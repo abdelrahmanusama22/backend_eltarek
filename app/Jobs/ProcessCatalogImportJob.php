@@ -3,208 +3,245 @@
 namespace App\Jobs;
 
 use App\Models\Brand;
+use App\Models\CatalogImportRun;
 use App\Models\Trim;
+use App\Models\User;
 use App\Models\Vehicle;
+use App\Support\CatalogEvents;
+use Filament\Notifications\Notification;
 use Illuminate\Bus\Queueable;
+use Illuminate\Contracts\Queue\ShouldBeUnique;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
-use Filament\Notifications\Notification;
+use Illuminate\Support\Facades\DB;
 use OpenSpout\Reader\XLSX\Reader;
 
-class ProcessCatalogImportJob implements ShouldQueue
+class ProcessCatalogImportJob implements ShouldBeUnique, ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
     public $timeout = 600; // 10 minutes
 
+    public int $tries = 3;
+
+    public array $backoff = [30, 120];
+
+    public int $uniqueFor = 900;
+
     public function __construct(
         public string $filePath,
         public array $selectedColumns,
-        public int $userId
+        public int $userId,
+        public int $runId,
     ) {}
+
+    public function uniqueId(): string
+    {
+        return hash('sha256', $this->filePath);
+    }
 
     public function handle(): void
     {
-        $reader = new Reader();
+        $reader = new Reader;
         $reader->open($this->filePath);
-        
+
         $importedCount = 0;
         $newVehiclesCount = 0;
         $newTrimsCount = 0;
-        
-        foreach ($reader->getSheetIterator() as $sheet) {
-            $sheetName = $sheet->getName();
-            
-            // Skip non-catalog sheets
-            if (in_array(strtolower($sheetName), ['settings', 'duplicate', 'edit', 'up - 5 %'])) {
-                continue;
-            }
+        $rejectedCount = 0;
+        $rejected = [];
+        CatalogImportRun::whereKey($this->runId)->update(['status' => 'processing', 'started_at' => now()]);
 
-            $header = [];
-            $foundHeader = false;
-            
-            foreach ($sheet->getRowIterator() as $row) {
-                $cells = $row->toArray();
-                
-                if (!$foundHeader) {
-                    $normalizedCells = array_map(fn($val) => trim(strtolower((string)$val)), $cells);
-                    if (in_array('brand', $normalizedCells) && in_array('model', $normalizedCells)) {
-                        $header = $normalizedCells;
-                        $foundHeader = true;
+        CatalogEvents::suppress();
+        try {
+            DB::transaction(function () use ($reader, &$importedCount, &$newVehiclesCount, &$newTrimsCount, &$rejectedCount, &$rejected): void {
+                foreach ($reader->getSheetIterator() as $sheet) {
+                    $sheetName = $sheet->getName();
+
+                    // Skip non-catalog sheets
+                    if (in_array(strtolower($sheetName), ['settings', 'duplicate', 'edit', 'up - 5 %'])) {
+                        continue;
                     }
-                    continue;
-                }
-                
-                $rowData = [];
-                foreach ($header as $index => $colName) {
-                    if ($colName && isset($cells[$index])) {
-                        $rowData[$colName] = $cells[$index];
+
+                    $header = [];
+                    $foundHeader = false;
+
+                    foreach ($sheet->getRowIterator() as $row) {
+                        $cells = $row->toArray();
+
+                        if (! $foundHeader) {
+                            $normalizedCells = array_map(fn ($val) => trim(strtolower((string) $val)), $cells);
+                            if (in_array('brand', $normalizedCells) && in_array('model', $normalizedCells)) {
+                                $header = $normalizedCells;
+                                $foundHeader = true;
+                            }
+
+                            continue;
+                        }
+
+                        $rowData = [];
+                        foreach ($header as $index => $colName) {
+                            if ($colName && isset($cells[$index])) {
+                                $rowData[$colName] = $cells[$index];
+                            }
+                        }
+
+                        $brandName = trim((string) ($rowData['brand'] ?? ''));
+                        $modelName = trim((string) ($rowData['model'] ?? ''));
+                        $yearRaw = trim((string) ($rowData['year'] ?? ''));
+
+                        $year = (int) preg_replace('/[^0-9]/', '', $yearRaw);
+                        if ($year < 1990 || $year > 2050) {
+                            $rejectedCount++;
+                            if (count($rejected) < 100) {
+                                $rejected[] = ['sheet' => $sheetName, 'reason' => 'Invalid year', 'row' => $cells];
+                            }
+
+                            continue;
+                        }
+
+                        if (! $brandName || ! $modelName || in_array(strtoupper($brandName), ['YES', 'NO', 'BRAND']) || in_array(strtoupper($modelName), ['YES', 'NO', 'MODEL'])) {
+                            $rejectedCount++;
+                            if (count($rejected) < 100) {
+                                $rejected[] = ['sheet' => $sheetName, 'reason' => 'Missing/invalid brand or model', 'row' => $cells];
+                            }
+
+                            continue;
+                        }
+
+                        // Trim Name could be in 'category' or 'trim' or derived from 'model sales code'
+                        $trimName = trim((string) ($rowData['category'] ?? $rowData['trim'] ?? ''));
+                        if (! $trimName) {
+                            $salesCode = trim((string) ($rowData['model sales code'] ?? ''));
+                            if ($salesCode) {
+                                $trimName = trim(str_replace([$brandName, $modelName, (string) $year, '- retail', '- Retail', 'Retail'], '', $salesCode));
+                                $trimName = trim($trimName, ' -');
+                            }
+                        }
+
+                        if (! $trimName) {
+                            $trimName = 'Standard';
+                        }
+
+                        // 1. Upsert Brand
+                        $brand = Brand::firstOrCreate(
+                            ['name' => $brandName],
+                            ['name_ar' => '', 'active' => true, 'sort' => 0]
+                        );
+
+                        // 2. Upsert Vehicle
+                        $vehicle = Vehicle::firstOrCreate(
+                            ['brand_id' => $brand->id, 'model' => $modelName, 'year' => $year],
+                            ['model_ar' => '', 'category' => 'Other', 'active' => true, 'sort' => 0, 'starting_price_egp' => 0]
+                        );
+
+                        if ($vehicle->wasRecentlyCreated) {
+                            $newVehiclesCount++;
+                        }
+
+                        // 3. Upsert Trim
+                        $trimData = [
+                            'active' => true,
+                        ];
+
+                        if (isset($rowData['car id'])) {
+                            $trimData['legacy_car_id'] = $rowData['car id'];
+                        }
+
+                        // Pricing
+                        if (in_array('price_egp', $this->selectedColumns)) {
+                            $officialPrice = $rowData['official price'] ?? $rowData['السعر الرسمى'] ?? 0;
+                            $trimData['price_egp'] = (int) preg_replace('/[^0-9]/', '', (string) $officialPrice);
+                        }
+
+                        if (in_array('markup_percentage', $this->selectedColumns)) {
+                            $officialPriceStr = $rowData['official price'] ?? $rowData['السعر الرسمى'] ?? 0;
+                            $executivePriceStr = $rowData['price +5%'] ?? $rowData['السعر + 5 %'] ?? 0;
+
+                            $officialPrice = (int) preg_replace('/[^0-9]/', '', (string) $officialPriceStr);
+                            $executivePrice = (int) preg_replace('/[^0-9]/', '', (string) $executivePriceStr);
+
+                            if ($officialPrice > 0 && $executivePrice > 0) {
+                                $markup = (($executivePrice - $officialPrice) / $officialPrice) * 100;
+                                $trimData['markup_percentage'] = round($markup, 2);
+                            } else {
+                                $trimData['markup_percentage'] = 5.00;
+                            }
+                        }
+
+                        if (in_array('total_price', $this->selectedColumns)) {
+                            $total = $rowData['total price'] ?? $rowData['اجمالى السعر'] ?? 0;
+                            $trimData['total_price'] = (int) preg_replace('/[^0-9]/', '', (string) $total);
+                        }
+
+                        if (in_array('booking_deposit', $this->selectedColumns)) {
+                            $deposit = $rowData['booking deposit'] ?? $rowData['مقدم الحجز'] ?? 0;
+                            $trimData['booking_deposit'] = (int) preg_replace('/[^0-9]/', '', (string) $deposit);
+                        }
+
+                        if (in_array('is_on_hold', $this->selectedColumns)) {
+                            $holdVal = strtolower(trim((string) ($rowData['hold'] ?? 'no')));
+                            $trimData['is_on_hold'] = ($holdVal === 'yes' || $holdVal === 'true' || $holdVal === '1');
+                        }
+
+                        if (in_array('colors', $this->selectedColumns)) {
+                            $trimData['colors'] = trim((string) ($rowData['colors'] ?? $rowData['الوان متاحة'] ?? ''));
+                        }
+
+                        if (in_array('financing_notes', $this->selectedColumns)) {
+                            $trimData['financing_notes'] = trim((string) ($rowData['financing notes'] ?? $rowData['معلومات اضافية'] ?? ''));
+                        }
+
+                        if (in_array('zero_interest_price', $this->selectedColumns)) {
+                            $zero = $rowData['zero interest price'] ?? $rowData['عرض زيرو فائدة'] ?? 0;
+                            $trimData['zero_interest_price'] = (int) preg_replace('/[^0-9]/', '', (string) $zero);
+                        }
+
+                        if (in_array('price_9pct', $this->selectedColumns)) {
+                            $p9 = $rowData['install price 9%'] ?? $rowData['سعر السيارة قسط 9%'] ?? 0;
+                            $trimData['price_9pct'] = (int) preg_replace('/[^0-9]/', '', (string) $p9);
+                        }
+
+                        $existingTrim = Trim::where('vehicle_id', $vehicle->id)->where('name', $trimName)->first();
+                        if ($existingTrim) {
+                            $existingTrim->update($trimData);
+                        } else {
+                            $trimData['name_ar'] = '';
+                            $trimData['highlights'] = [];
+                            $trimData['specs'] = [
+                                'tech' => ['engine' => '', 'hp' => '', 'transmission' => ''],
+                                'safety' => ['airbags' => '', 'abs_ebd' => ''],
+                                'interior' => ['seats_material' => '', 'screen_size' => ''],
+                                'exterior' => ['wheels_size' => '', 'sunroof' => ''],
+                            ];
+                            $trimData['metrics'] = [
+                                'hp' => ['display' => '', 'score' => 0],
+                                'accel' => ['display' => '', 'score' => 0],
+                                'speed' => ['display' => '', 'score' => 0],
+                            ];
+                            $trimData['gallery'] = [];
+                            $trimData['price_egp'] = $trimData['price_egp'] ?? 0;
+
+                            Trim::create(array_merge([
+                                'vehicle_id' => $vehicle->id,
+                                'name' => $trimName,
+                            ], $trimData));
+
+                            $newTrimsCount++;
+                        }
+
+                        $importedCount++;
                     }
                 }
-                
-                $brandName = trim((string)($rowData['brand'] ?? ''));
-                $modelName = trim((string)($rowData['model'] ?? ''));
-                $yearRaw = trim((string)($rowData['year'] ?? ''));
-                
-                $year = (int) preg_replace('/[^0-9]/', '', $yearRaw);
-                if ($year < 1990 || $year > 2050) {
-                    continue;
-                }
-                
-                if (!$brandName || !$modelName || in_array(strtoupper($brandName), ['YES', 'NO', 'BRAND']) || in_array(strtoupper($modelName), ['YES', 'NO', 'MODEL'])) {
-                    continue; 
-                }
-
-                // Trim Name could be in 'category' or 'trim' or derived from 'model sales code'
-                $trimName = trim((string)($rowData['category'] ?? $rowData['trim'] ?? ''));
-                if (!$trimName) {
-                    $salesCode = trim((string)($rowData['model sales code'] ?? ''));
-                    if ($salesCode) {
-                        $trimName = trim(str_replace([$brandName, $modelName, (string)$year, '- retail', '- Retail', 'Retail'], '', $salesCode));
-                        $trimName = trim($trimName, ' -');
-                    }
-                }
-                
-                if (!$trimName) {
-                    $trimName = 'Standard';
-                }
-
-                // 1. Upsert Brand
-                $brand = Brand::firstOrCreate(
-                    ['name' => $brandName],
-                    ['name_ar' => '', 'active' => true, 'sort' => 0]
-                );
-
-                // 2. Upsert Vehicle
-                $vehicle = Vehicle::firstOrCreate(
-                    ['brand_id' => $brand->id, 'model' => $modelName, 'year' => $year],
-                    ['model_ar' => '', 'category' => 'Other', 'active' => true, 'sort' => 0, 'starting_price_egp' => 0]
-                );
-                
-                if ($vehicle->wasRecentlyCreated) {
-                    $newVehiclesCount++;
-                }
-
-                // 3. Upsert Trim
-                $trimData = [
-                    'active' => true,
-                ];
-                
-                if (isset($rowData['car id'])) {
-                    $trimData['legacy_car_id'] = $rowData['car id'];
-                }
-
-                // Pricing
-                if (in_array('price_egp', $this->selectedColumns)) {
-                    $officialPrice = $rowData['official price'] ?? $rowData['السعر الرسمى'] ?? 0;
-                    $trimData['price_egp'] = (int) preg_replace('/[^0-9]/', '', (string)$officialPrice);
-                }
-                
-                if (in_array('markup_percentage', $this->selectedColumns)) {
-                    $officialPriceStr = $rowData['official price'] ?? $rowData['السعر الرسمى'] ?? 0;
-                    $executivePriceStr = $rowData['price +5%'] ?? $rowData['السعر + 5 %'] ?? 0;
-                    
-                    $officialPrice = (int) preg_replace('/[^0-9]/', '', (string)$officialPriceStr);
-                    $executivePrice = (int) preg_replace('/[^0-9]/', '', (string)$executivePriceStr);
-                    
-                    if ($officialPrice > 0 && $executivePrice > 0) {
-                        $markup = (($executivePrice - $officialPrice) / $officialPrice) * 100;
-                        $trimData['markup_percentage'] = round($markup, 2);
-                    } else {
-                        $trimData['markup_percentage'] = 5.00;
-                    }
-                }
-                
-                if (in_array('total_price', $this->selectedColumns)) {
-                    $total = $rowData['total price'] ?? $rowData['اجمالى السعر'] ?? 0;
-                    $trimData['total_price'] = (int) preg_replace('/[^0-9]/', '', (string)$total);
-                }
-                
-                if (in_array('booking_deposit', $this->selectedColumns)) {
-                    $deposit = $rowData['booking deposit'] ?? $rowData['مقدم الحجز'] ?? 0;
-                    $trimData['booking_deposit'] = (int) preg_replace('/[^0-9]/', '', (string)$deposit);
-                }
-                
-                if (in_array('is_on_hold', $this->selectedColumns)) {
-                    $holdVal = strtolower(trim((string)($rowData['hold'] ?? 'no')));
-                    $trimData['is_on_hold'] = ($holdVal === 'yes' || $holdVal === 'true' || $holdVal === '1');
-                }
-                
-                if (in_array('colors', $this->selectedColumns)) {
-                    $trimData['colors'] = trim((string)($rowData['colors'] ?? $rowData['الوان متاحة'] ?? ''));
-                }
-                
-                if (in_array('financing_notes', $this->selectedColumns)) {
-                    $trimData['financing_notes'] = trim((string)($rowData['financing notes'] ?? $rowData['معلومات اضافية'] ?? ''));
-                }
-                
-                if (in_array('zero_interest_price', $this->selectedColumns)) {
-                    $zero = $rowData['zero interest price'] ?? $rowData['عرض زيرو فائدة'] ?? 0;
-                    $trimData['zero_interest_price'] = (int) preg_replace('/[^0-9]/', '', (string)$zero);
-                }
-                
-                if (in_array('price_9pct', $this->selectedColumns)) {
-                    $p9 = $rowData['install price 9%'] ?? $rowData['سعر السيارة قسط 9%'] ?? 0;
-                    $trimData['price_9pct'] = (int) preg_replace('/[^0-9]/', '', (string)$p9);
-                }
-
-                $existingTrim = Trim::where('vehicle_id', $vehicle->id)->where('name', $trimName)->first();
-                if ($existingTrim) {
-                    $existingTrim->update($trimData);
-                } else {
-                    $trimData['name_ar'] = '';
-                    $trimData['highlights'] = [];
-                    $trimData['specs'] = [
-                        'tech' => ['engine' => '', 'hp' => '', 'transmission' => ''], 
-                        'safety' => ['airbags' => '', 'abs_ebd' => ''], 
-                        'interior' => ['seats_material' => '', 'screen_size' => ''], 
-                        'exterior' => ['wheels_size' => '', 'sunroof' => '']
-                    ];
-                    $trimData['metrics'] = [
-                        'hp' => ['display' => '', 'score' => 0],
-                        'accel' => ['display' => '', 'score' => 0],
-                        'speed' => ['display' => '', 'score' => 0]
-                    ];
-                    $trimData['gallery'] = [];
-                    $trimData['price_egp'] = $trimData['price_egp'] ?? 0;
-                    
-                    Trim::create(array_merge([
-                        'vehicle_id' => $vehicle->id,
-                        'name' => $trimName,
-                    ], $trimData));
-                    
-                    $newTrimsCount++;
-                }
-                
-                $importedCount++;
-            }
+            }, 3);
+        } finally {
+            $reader->close();
+            CatalogEvents::resume();
         }
-        
-        $reader->close();
-        
-        $user = \App\Models\User::find($this->userId);
+
+        $user = User::find($this->userId);
         if ($user) {
             Notification::make()
                 ->title('Catalog Import Completed')
@@ -212,9 +249,9 @@ class ProcessCatalogImportJob implements ShouldQueue
                 ->success()
                 ->sendToDatabase($user);
         }
-        
+
         if ($newVehiclesCount > 0 || $newTrimsCount > 0) {
-            $admins = \App\Models\User::where('is_admin', true)->get();
+            $admins = User::where('is_admin', true)->get();
             foreach ($admins as $admin) {
                 Notification::make()
                     ->title('New Vehicles Synced!')
@@ -222,6 +259,43 @@ class ProcessCatalogImportJob implements ShouldQueue
                     ->warning()
                     ->sendToDatabase($admin);
             }
+        }
+
+        $this->cleanupFile();
+        CatalogEvents::broadcast('Catalog import completed');
+        CatalogImportRun::whereKey($this->runId)->update([
+            'status' => 'completed',
+            'processed_rows' => $importedCount,
+            'rejected_rows' => $rejectedCount,
+            'new_vehicles' => $newVehiclesCount,
+            'new_trims' => $newTrimsCount,
+            'errors' => $rejected,
+            'finished_at' => now(),
+        ]);
+    }
+
+    public function failed(\Throwable $exception): void
+    {
+        CatalogImportRun::whereKey($this->runId)->update([
+            'status' => 'failed',
+            'errors' => [['reason' => $exception->getMessage()]],
+            'finished_at' => now(),
+        ]);
+        $this->cleanupFile();
+        $user = User::find($this->userId);
+        if ($user) {
+            Notification::make()
+                ->title('Catalog Import Failed')
+                ->body('The catalog file could not be imported. Please validate it and try again.')
+                ->danger()
+                ->sendToDatabase($user);
+        }
+    }
+
+    private function cleanupFile(): void
+    {
+        if (is_file($this->filePath)) {
+            @unlink($this->filePath);
         }
     }
 }

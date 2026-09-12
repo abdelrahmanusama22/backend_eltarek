@@ -20,7 +20,6 @@ class TrimResource extends Resource
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedAdjustmentsHorizontal;
 
-
     public static function getNavigationGroup(): ?string
     {
         return 'Catalog Management';

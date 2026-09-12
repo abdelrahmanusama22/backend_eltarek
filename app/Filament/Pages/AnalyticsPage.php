@@ -6,16 +6,17 @@ use App\Models\AnalyticsEvent;
 use App\Models\Booking;
 use App\Models\Branch;
 use App\Models\User;
-use App\Models\Vehicle;
-use App\Models\Trim;
+use BackedEnum;
+use BezhanSalleh\FilamentShield\Traits\HasPageShield;
 use Carbon\Carbon;
 use Filament\Pages\Page;
-use BackedEnum;
 use Illuminate\Contracts\Support\Htmlable;
 use Illuminate\Support\Facades\DB;
 
 class AnalyticsPage extends Page
 {
+    use HasPageShield;
+
     protected string $view = 'filament.pages.analytics-page';
 
     public static function getNavigationGroup(): ?string
@@ -48,10 +49,10 @@ class AnalyticsPage extends Page
     public function getStartDate(): Carbon
     {
         return match ($this->period) {
-            'today'   => Carbon::today(),
-            '30days'  => Carbon::now()->subDays(30)->startOfDay(),
-            'all'     => Carbon::createFromTimestamp(0),
-            default   => Carbon::now()->subDays(7)->startOfDay(),
+            'today' => Carbon::today(),
+            '30days' => Carbon::now()->subDays(30)->startOfDay(),
+            'all' => Carbon::createFromTimestamp(0),
+            default => Carbon::now()->subDays(7)->startOfDay(),
         };
     }
 
@@ -64,7 +65,10 @@ class AnalyticsPage extends Page
         $conversionRate = $totalBookings > 0 ? round(($confirmedBookings / $totalBookings) * 100, 1) : 0;
 
         $totalEvents = AnalyticsEvent::where('created_at', '>=', $startDate)->count();
-        $activeUsers = User::where('created_at', '>=', $startDate)->count();
+        $activeUsers = AnalyticsEvent::where('created_at', '>=', $startDate)
+            ->whereNotNull('user_id')
+            ->distinct('user_id')
+            ->count('user_id');
         $totalCustomers = User::where('is_admin', false)->count();
 
         // Top viewed vehicles from AnalyticsEvent
@@ -93,36 +97,44 @@ class AnalyticsPage extends Page
 
         // Chart Data (Day by Day)
         $daysCount = match ($this->period) {
-            'today'  => 1,
+            'today' => 1,
             '30days' => 30,
-            'all'    => 30,
-            default  => 7,
+            'all' => 30,
+            default => 7,
         };
 
         $chartLabels = [];
         $chartBookings = [];
         $chartEvents = [];
 
+        $chartStart = Carbon::today()->subDays($daysCount - 1)->startOfDay();
+        $bookingCounts = Booking::where('created_at', '>=', $chartStart)
+            ->selectRaw('DATE(created_at) as day, COUNT(*) as total')
+            ->groupBy('day')->pluck('total', 'day');
+        $eventCounts = AnalyticsEvent::where('created_at', '>=', $chartStart)
+            ->selectRaw('DATE(created_at) as day, COUNT(*) as total')
+            ->groupBy('day')->pluck('total', 'day');
+
         for ($i = $daysCount - 1; $i >= 0; $i--) {
             $d = Carbon::today()->subDays($i);
             $chartLabels[] = $d->format('M d');
-            $chartBookings[] = Booking::whereDate('created_at', $d)->count();
-            $chartEvents[] = AnalyticsEvent::whereDate('created_at', $d)->count();
+            $chartBookings[] = (int) ($bookingCounts[$d->toDateString()] ?? 0);
+            $chartEvents[] = (int) ($eventCounts[$d->toDateString()] ?? 0);
         }
 
         return [
-            'totalBookings'     => $totalBookings,
+            'totalBookings' => $totalBookings,
             'confirmedBookings' => $confirmedBookings,
-            'conversionRate'    => $conversionRate,
-            'totalEvents'       => $totalEvents,
-            'activeUsers'       => $activeUsers,
-            'totalCustomers'    => $totalCustomers,
+            'conversionRate' => $conversionRate,
+            'totalEvents' => $totalEvents,
+            'activeUsers' => $activeUsers,
+            'totalCustomers' => $totalCustomers,
             'topViewedVehicles' => $topViewedVehicles,
-            'branchBookings'    => $branchBookings,
-            'recentEvents'      => $recentEvents,
-            'chartLabels'       => $chartLabels,
-            'chartBookings'     => $chartBookings,
-            'chartEvents'       => $chartEvents,
+            'branchBookings' => $branchBookings,
+            'recentEvents' => $recentEvents,
+            'chartLabels' => $chartLabels,
+            'chartBookings' => $chartBookings,
+            'chartEvents' => $chartEvents,
         ];
     }
 }

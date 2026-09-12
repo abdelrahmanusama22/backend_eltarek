@@ -2,7 +2,9 @@
 
 namespace App\Filament\Imports;
 
+use App\Models\Brand;
 use App\Models\Trim;
+use App\Models\Vehicle;
 use Filament\Actions\Imports\ImportColumn;
 use Filament\Actions\Imports\Importer;
 use Filament\Actions\Imports\Models\Import;
@@ -18,29 +20,29 @@ class TrimImporter extends Importer
                 ->label('ID')
                 ->numeric()
                 ->rules(['integer']),
-                
+
             // Non-database / Related fields (Ignored on Trim save)
             ImportColumn::make('vehicle_brand_name')
                 ->label('Brand')
-                ->fillRecordUsing(fn() => null),
+                ->fillRecordUsing(fn () => null),
             ImportColumn::make('vehicle_model')
                 ->label('Model')
-                ->fillRecordUsing(fn() => null),
+                ->fillRecordUsing(fn () => null),
             ImportColumn::make('year')
                 ->label('Year')
-                ->fillRecordUsing(fn() => null), // Handled in afterSave
+                ->fillRecordUsing(fn () => null), // Handled in afterSave
             ImportColumn::make('legacy_car_id')
                 ->label('Legacy Car ID')
-                ->fillRecordUsing(fn() => null),
+                ->fillRecordUsing(fn () => null),
             ImportColumn::make('executive_price')
                 ->label('Executive Price EGP')
-                ->fillRecordUsing(fn() => null), // Computed attribute
+                ->fillRecordUsing(fn () => null), // Computed attribute
             ImportColumn::make('category')
                 ->label('Category')
-                ->fillRecordUsing(fn() => null), // Handled in afterSave
+                ->fillRecordUsing(fn () => null), // Handled in afterSave
             ImportColumn::make('vehicle_engine_summary')
                 ->label('Engine Summary')
-                ->fillRecordUsing(fn() => null),
+                ->fillRecordUsing(fn () => null),
 
             // Actual Database fields
             ImportColumn::make('name')
@@ -132,32 +134,32 @@ class TrimImporter extends Importer
         $trimName = trim($this->data['name'] ?? '');
 
         // Fallback: If ID is provided, look it up directly.
-        if (!empty($this->data['id'])) {
-            return Trim::find($this->data['id']) ?? new Trim();
+        if (! empty($this->data['id'])) {
+            return Trim::find($this->data['id']) ?? new Trim;
         }
 
         // If basic relationships are missing, fallback to new Trim and let validation fail or save orphaned.
         if (empty($brandName) || empty($modelName) || empty($trimName)) {
-            return new Trim();
+            return new Trim;
         }
 
         // 1. Safely resolve or create the Brand
-        $brand = \App\Models\Brand::firstOrCreate(
+        $brand = Brand::firstOrCreate(
             ['name' => $brandName],
             ['active' => true]
         );
 
         // 2. Safely resolve or create the Vehicle
-        $vehicle = \App\Models\Vehicle::firstOrCreate(
+        $vehicle = Vehicle::firstOrCreate(
             [
                 'brand_id' => $brand->id,
-                'model'    => $modelName,
-                'year'     => $year,
+                'model' => $modelName,
+                'year' => $year,
             ],
             [
-                'category'           => $this->data['category'] ?? null,
-                'engine_summary'     => $this->data['vehicle_engine_summary'] ?? null,
-                'active'             => true,
+                'category' => $this->data['category'] ?? null,
+                'engine_summary' => $this->data['vehicle_engine_summary'] ?? null,
+                'active' => true,
                 'starting_price_egp' => 0,
             ]
         );
@@ -165,21 +167,21 @@ class TrimImporter extends Importer
         // 3. Resolve or create Trim
         return Trim::firstOrNew([
             'vehicle_id' => $vehicle->id,
-            'name'       => $trimName,
+            'name' => $trimName,
         ]);
     }
-    
+
     protected function afterSave(): void
     {
         $vehicle = $this->record->vehicle;
-        
+
         if ($vehicle) {
             $vehicleUpdates = [];
-            
+
             if (isset($this->data['category']) && filled($this->data['category'])) {
                 $vehicleUpdates['category'] = $this->data['category'];
             }
-            
+
             if (isset($this->data['year']) && filled($this->data['year'])) {
                 $vehicleUpdates['year'] = $this->data['year'];
             }
@@ -187,8 +189,8 @@ class TrimImporter extends Importer
             if (isset($this->data['vehicle_engine_summary']) && filled($this->data['vehicle_engine_summary'])) {
                 $vehicleUpdates['engine_summary'] = $this->data['vehicle_engine_summary'];
             }
-            
-            if (!empty($vehicleUpdates)) {
+
+            if (! empty($vehicleUpdates)) {
                 $vehicle->update($vehicleUpdates);
             }
         }
@@ -196,10 +198,10 @@ class TrimImporter extends Importer
 
     public static function getCompletedNotificationBody(Import $import): string
     {
-        $body = 'Your trim import has completed and ' . number_format($import->successful_rows) . ' ' . str('row')->plural($import->successful_rows) . ' imported.';
+        $body = 'Your trim import has completed and '.number_format($import->successful_rows).' '.str('row')->plural($import->successful_rows).' imported.';
 
         if ($failedRowsCount = $import->getFailedRowsCount()) {
-            $body .= ' ' . number_format($failedRowsCount) . ' ' . str('row')->plural($failedRowsCount) . ' failed to import.';
+            $body .= ' '.number_format($failedRowsCount).' '.str('row')->plural($failedRowsCount).' failed to import.';
         }
 
         return $body;

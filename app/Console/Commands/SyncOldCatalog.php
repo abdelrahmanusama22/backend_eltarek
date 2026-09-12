@@ -25,15 +25,17 @@ class SyncOldCatalog extends Command
         try {
             $response = Http::timeout(30)->get('http://192.168.202.62:8087/api/export-catalog');
 
-            if (!$response->successful()) {
-                $this->error('Failed to fetch data. HTTP Status: ' . $response->status());
+            if (! $response->successful()) {
+                $this->error('Failed to fetch data. HTTP Status: '.$response->status());
+
                 return self::FAILURE;
             }
 
             $data = $response->json('data');
 
-            if (!is_array($data) || empty($data)) {
+            if (! is_array($data) || empty($data)) {
                 $this->warn('No data found to sync.');
+
                 return self::SUCCESS;
             }
 
@@ -44,7 +46,7 @@ class SyncOldCatalog extends Command
                     $brandId = $brandData['id'] ?? $item['brand_id'] ?? null;
                     $brandName = $brandData['name'] ?? $item['brand_name'] ?? 'Unknown';
 
-                    if (!$brandId) {
+                    if (! $brandId) {
                         return; // Cannot sync without brand id
                     }
 
@@ -106,7 +108,8 @@ class SyncOldCatalog extends Command
 
             return self::SUCCESS;
         } catch (\Exception $e) {
-            $this->error('An error occurred during sync: ' . $e->getMessage());
+            $this->error('An error occurred during sync: '.$e->getMessage());
+
             return self::FAILURE;
         }
     }

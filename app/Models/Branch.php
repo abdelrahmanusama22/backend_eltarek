@@ -2,9 +2,10 @@
 
 namespace App\Models;
 
+use App\Support\CatalogEvents;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Branch extends Model
 {
@@ -12,22 +13,33 @@ class Branch extends Model
 
     public $timestamps = false;
 
-    protected $guarded = [];
+    protected $fillable = [
+        'city_id', 'image', 'name', 'name_ar', 'address', 'address_ar', 'phone',
+        'whatsapp', 'hours', 'hours_ar', 'opening_hours', 'timezone', 'is_open', 'lat', 'lng', 'services', 'active',
+    ];
 
     protected $casts = [
         'services' => 'array',
+        'opening_hours' => 'array',
         'is_open' => 'boolean',
         'active' => 'boolean',
         'lat' => 'float',
         'lng' => 'float',
     ];
 
+    protected static function booted(): void
+    {
+        static::saved(fn () => CatalogEvents::broadcast('Branches updated'));
+        static::deleted(fn () => CatalogEvents::broadcast('Branches updated'));
+        static::restored(fn () => CatalogEvents::broadcast('Branches updated'));
+    }
+
     public function toApi(?float $lat = null, ?float $lng = null): array
     {
         $data = [
             'id' => $this->id,
             'city_id' => $this->city_id,
-            'image' => $this->image ? asset('storage/' . $this->image) : null,
+            'image' => $this->image ? asset('storage/'.$this->image) : null,
             'name' => $this->name,
             'name_ar' => $this->name_ar,
             'address' => $this->address,
@@ -36,7 +48,7 @@ class Branch extends Model
             'whatsapp' => $this->whatsapp ?: $this->phone,
             'hours' => $this->hours,
             'hours_ar' => $this->hours_ar,
-            'is_open' => $this->is_open,
+            'is_open' => $this->isOpenNow(),
             'lat' => $this->lat,
             'lng' => $this->lng,
             'services' => $this->services ?? [],
@@ -46,6 +58,21 @@ class Branch extends Model
         }
 
         return $data;
+    }
+
+    public function isOpenNow(): bool
+    {
+        if (empty($this->opening_hours)) return (bool) $this->is_open;
+        $now = now($this->timezone ?: 'Africa/Cairo');
+        $day = strtolower($now->format('D'));
+        foreach ($this->opening_hours as $slot) {
+            if (($slot['day'] ?? null) !== $day || ($slot['closed'] ?? false)) continue;
+            $open = $now->copy()->setTimeFromTimeString($slot['open'] ?? '00:00');
+            $close = $now->copy()->setTimeFromTimeString($slot['close'] ?? '00:00');
+            if ($close->lessThanOrEqualTo($open)) $close->addDay();
+            if ($now->betweenIncluded($open, $close)) return true;
+        }
+        return false;
     }
 
     /** Haversine distance in km. */

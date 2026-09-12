@@ -2,12 +2,12 @@
 
 namespace App\Filament\Widgets;
 
-use Filament\Widgets\StatsOverviewWidget;
-use Filament\Widgets\StatsOverviewWidget\Stat;
-use App\Models\Vehicle;
 use App\Models\Booking;
 use App\Models\User;
+use App\Models\Vehicle;
 use Carbon\Carbon;
+use Filament\Widgets\StatsOverviewWidget;
+use Filament\Widgets\StatsOverviewWidget\Stat;
 
 class StatsOverview extends StatsOverviewWidget
 {
@@ -21,21 +21,19 @@ class StatsOverview extends StatsOverviewWidget
         $pendingRequests = Booking::where('status', 'pending')->count();
 
         return [
-            Stat::make("Today's Bookings", $todayBookings ?: '142')
-                ->description('+12.4% vs yesterday')
-                ->descriptionIcon('heroicon-m-arrow-trending-up')
+            Stat::make("Today's Bookings", $todayBookings)
+                ->description('Created today')
                 ->color('success'),
 
-            Stat::make('Total Customers', number_format($totalCustomers ?: 8409))
-                ->description('+5.8% this month')
-                ->descriptionIcon('heroicon-m-arrow-trending-up')
+            Stat::make('Total Customers', number_format($totalCustomers))
+                ->description('Registered customers')
                 ->color('success'),
 
-            Stat::make('Active Vehicles', $activeVehicles ?: '315')
-                ->description('287 available')
+            Stat::make('Active Vehicles', $activeVehicles)
+                ->description('Catalog records')
                 ->color('gray'),
 
-            Stat::make('Pending Requests', $pendingRequests ?: '18')
+            Stat::make('Pending Requests', $pendingRequests)
                 ->description('Requires attention')
                 ->descriptionIcon('heroicon-m-exclamation-circle')
                 ->color('danger'),

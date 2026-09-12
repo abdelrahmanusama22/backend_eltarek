@@ -5,6 +5,7 @@ namespace App\Filament\Resources\GarageCars\Schemas;
 use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\FileUpload;
 use Filament\Forms\Components\TextInput;
+use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Toggle;
 use Filament\Schemas\Schema;
 
@@ -14,10 +15,11 @@ class GarageCarForm
     {
         return $schema
             ->components([
-                TextInput::make('user_id')
-                    ->label('User ID')
-                    ->required()
-                    ->numeric(),
+                Select::make('user_id')->label('Customer')->relationship('user', 'email')
+                    ->getOptionLabelFromRecordUsing(fn ($record) => "{$record->name} — {$record->email} — {$record->phone}")
+                    ->searchable(['name', 'email', 'phone'])->preload()->required(),
+                Select::make('vehicle_id')->relationship('vehicle', 'model')->searchable()->preload(),
+                Select::make('trim_id')->relationship('trim', 'name')->searchable()->preload(),
                 TextInput::make('tracking_code')
                     ->required()
                     ->unique(ignoreRecord: true),

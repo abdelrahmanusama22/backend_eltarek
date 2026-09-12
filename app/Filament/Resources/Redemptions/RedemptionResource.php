@@ -25,9 +25,6 @@ class RedemptionResource extends Resource
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedTicket;
 
-
-
-
     public static function form(Schema $schema): Schema
     {
         return RedemptionForm::configure($schema);
@@ -49,8 +46,6 @@ class RedemptionResource extends Resource
     {
         return [
             'index' => ListRedemptions::route('/'),
-            'create' => CreateRedemption::route('/create'),
-            'edit' => EditRedemption::route('/{record}/edit'),
         ];
     }
 }

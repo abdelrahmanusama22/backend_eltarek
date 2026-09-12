@@ -20,7 +20,6 @@ class BrandResource extends Resource
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedTag;
 
-
     public static function getNavigationGroup(): ?string
     {
         return 'Catalog Management';
