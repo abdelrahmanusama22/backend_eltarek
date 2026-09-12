@@ -27,6 +27,6 @@ class AppSetting extends Model
     public static function put(string $key, mixed $value): void
     {
         static::updateOrCreate(['key' => $key], ['value' => $value]);
-        Cache::forget('api:v1:bootstrap:public:v2');
+        Cache::forget('api:v1:home:payload');
     }
 }

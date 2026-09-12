@@ -37,14 +37,21 @@ class GarageCar extends Model
         if (! $path) {
             return $this->vehicle?->resolved_image_url;
         }
-        if (str_starts_with($path, 'http')) {
+        if (str_starts_with($path, 'http://') || str_starts_with($path, 'https://')) {
             return $path;
         }
-        if (str_starts_with($path, 'assets/')) {
-            return url($path);
+        $clean = ltrim((string) $path, '/');
+        if (str_starts_with($clean, 'storage/')) {
+            $clean = substr($clean, 8);
+        }
+        if (str_starts_with($clean, 'media/')) {
+            $clean = substr($clean, 6);
+        }
+        if (str_starts_with($clean, 'assets/')) {
+            return '/'.$clean;
         }
 
-        return url(Storage::url($path));
+        return '/media/'.$clean;
     }
 
     public function toApi(): array

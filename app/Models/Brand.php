@@ -32,20 +32,37 @@ class Brand extends Model
         return $this->hasMany(Vehicle::class)->where('active', true)->where('starting_price_egp', '>', 0)->orderBy('sort');
     }
 
+    public function getMonogramAttribute(?string $value): string
+    {
+        if (! empty($value) && $value !== '?') {
+            return $value;
+        }
+        $name = trim((string) $this->name);
+
+        return ! empty($name) ? strtoupper(substr($name, 0, min(2, strlen($name)))) : 'ET';
+    }
+
     public function getResolvedLogoUrlAttribute(): ?string
     {
         $path = $this->logo_url;
         if (! $path) {
             return null;
         }
-        if (str_starts_with($path, 'http')) {
+        if (str_starts_with($path, 'http://') || str_starts_with($path, 'https://')) {
             return $path;
         }
-        if (str_starts_with($path, 'assets/')) {
-            return url($path);
+        $clean = ltrim((string) $path, '/');
+        if (str_starts_with($clean, 'storage/')) {
+            $clean = substr($clean, 8);
+        }
+        if (str_starts_with($clean, 'media/')) {
+            $clean = substr($clean, 6);
+        }
+        if (str_starts_with($clean, 'assets/')) {
+            return '/'.$clean;
         }
 
-        return url('/media/'.$path);
+        return '/media/'.$clean;
     }
 
     public function toApi(): array

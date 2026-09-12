@@ -3,7 +3,6 @@
 use App\Http\Controllers\Api\AnalyticsController;
 use App\Http\Controllers\Api\AppConfigController;
 use App\Http\Controllers\Api\AuthController;
-use App\Http\Controllers\Api\BootstrapController;
 use App\Http\Controllers\Api\BranchController;
 use App\Http\Controllers\Api\BrandController;
 use App\Http\Controllers\Api\CatalogController;
@@ -38,7 +37,6 @@ Route::prefix('v1')->group(function () {
     });
 
     // -------------------------------------------------------------- public
-    Route::get('bootstrap', BootstrapController::class);
     Route::get('app-config', AppConfigController::class);
     Route::get('catalog/version', [CatalogController::class, 'version']);
     Route::get('catalog/brands', [CatalogController::class, 'brands']);

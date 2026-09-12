@@ -3,6 +3,7 @@
 namespace App\Filament\Pages;
 
 use App\Models\AppSetting;
+use App\Support\CatalogEvents;
 use BackedEnum;
 use BezhanSalleh\FilamentShield\Traits\HasPageShield;
 use Filament\Forms\Components\DatePicker;
@@ -20,6 +21,7 @@ use Filament\Pages\Page;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Schema;
 use Illuminate\Contracts\Support\Htmlable;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 
 class AppSettingsPage extends Page implements HasForms
@@ -75,9 +77,6 @@ class AppSettingsPage extends Page implements HasForms
             'banner_subtitle_ar' => $banner['subtitle_ar'] ?? 'فائدة تبدأ من 0% بمقدم 30%',
             'banner_subtitle_en' => $banner['subtitle_en'] ?? 'Interest starting from 0% with 30% down payment',
             'banner_active' => $banner['active'] ?? true,
-            'home_hero_vehicle_ids' => AppSetting::get('home_hero_vehicle_ids', []),
-            'home_smart_matches' => AppSetting::get('smart_matches', []),
-            'home_budget_trim_ids' => AppSetting::get('budget_pick_trim_ids', []),
 
             // Holidays
             'blocked_dates' => AppSetting::get('blocked_dates', []),
@@ -158,30 +157,6 @@ class AppSettingsPage extends Page implements HasForms
                             ->label('Banner Subtitle (English)'),
                     ])->columns(2),
 
-                Section::make('Home page content')
-                    ->description('Choose exactly what appears on the mobile Home page. Order selected records by dragging repeater rows.')
-                    ->schema([
-                        Select::make('home_hero_vehicle_ids')
-                            ->label('Hero vehicles')
-                            ->multiple()->searchable()
-                            ->getSearchResultsUsing(fn (string $search): array => self::searchVehicles($search))
-                            ->getOptionLabelsUsing(fn (array $values): array => self::vehicleLabels($values))
-                            ->maxItems(5),
-                        Repeater::make('home_smart_matches')
-                            ->label('Smart matches')
-                            ->schema([
-                                Select::make('trim_id')->label('Vehicle trim')->searchable()->required()
-                                    ->getSearchResultsUsing(fn (string $search): array => self::searchTrims($search))
-                                    ->getOptionLabelUsing(fn ($value): ?string => self::trimLabel($value)),
-                                TextInput::make('match_percentage')->label('Match %')->numeric()->minValue(1)->maxValue(100)->required(),
-                            ])->columns(2)->reorderable()->maxItems(8),
-                        Select::make('home_budget_trim_ids')
-                            ->label('Budget picks')
-                            ->multiple()->searchable()->maxItems(8)
-                            ->getSearchResultsUsing(fn (string $search): array => self::searchTrims($search))
-                            ->getOptionLabelsUsing(fn (array $values): array => self::trimLabels($values)),
-                    ])->collapsible()->hidden(),
-
                 Section::make('Slot Management — Holidays & Blocked Dates')
                     ->description('Days when test-drives and branch visits are unavailable.')
                     ->schema([
@@ -223,10 +198,10 @@ class AppSettingsPage extends Page implements HasForms
         $data = $this->form->getState();
 
         $finance = [
-            'interest_rate' => (float) $data['finance_interest_rate'],
-            'min_down_payment_pct' => (float) $data['min_down_payment_pct'],
-            'admin_fee_pct' => (float) $data['admin_fee_pct'],
-            'max_tenure_years' => (int) $data['max_tenure_years'],
+            'interest_rate' => (float) ($data['finance_interest_rate'] ?? 15),
+            'min_down_payment_pct' => (float) ($data['min_down_payment_pct'] ?? 20),
+            'admin_fee_pct' => (float) ($data['admin_fee_pct'] ?? 1.5),
+            'max_tenure_years' => (int) ($data['max_tenure_years'] ?? 7),
         ];
         $banner = [
             'active' => (bool) ($data['banner_active'] ?? true),
@@ -236,29 +211,26 @@ class AppSettingsPage extends Page implements HasForms
             'subtitle_en' => $data['banner_subtitle_en'] ?? '',
         ];
         $testDriveTimes = [
-            'days_ahead' => (int) $data['test_drive_days_ahead'],
-            'min_notice_minutes' => (int) $data['test_drive_min_notice_minutes'],
+            'days_ahead' => (int) ($data['test_drive_days_ahead'] ?? 7),
+            'min_notice_minutes' => (int) ($data['test_drive_min_notice_minutes'] ?? 60),
         ];
         foreach (['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'] as $day) {
             $testDriveTimes[$day] = $this->normaliseTimes($data["test_drive_{$day}"] ?? []);
         }
 
         DB::transaction(function () use ($data, $finance, $banner, $testDriveTimes): void {
-            AppSetting::put('support_phone', $data['support_phone']);
-            AppSetting::put('support_whatsapp', $data['support_whatsapp']);
-            AppSetting::put('compare_max', (int) $data['compare_max']);
+            AppSetting::put('support_phone', (string) ($data['support_phone'] ?? '19022'));
+            AppSetting::put('support_whatsapp', (string) ($data['support_whatsapp'] ?? '+201000000000'));
+            AppSetting::put('compare_max', (int) ($data['compare_max'] ?? 3));
             AppSetting::put('finance', $finance);
-            AppSetting::put('finance_interest_rate', (float) $data['finance_interest_rate']);
+            AppSetting::put('finance_interest_rate', (float) $finance['interest_rate']);
             AppSetting::put('financing_banner', $banner);
             AppSetting::put('blocked_dates', $data['blocked_dates'] ?? []);
             AppSetting::put('test_drive_times', $testDriveTimes);
-            AppSetting::put('home_hero_vehicle_ids', array_map('intval', $data['home_hero_vehicle_ids'] ?? []));
-            AppSetting::put('smart_matches', collect($data['home_smart_matches'] ?? [])->map(fn (array $item): array => [
-                'trim_id' => (int) $item['trim_id'],
-                'match_percentage' => (int) $item['match_percentage'],
-            ])->values()->all());
-            AppSetting::put('budget_pick_trim_ids', array_map('intval', $data['home_budget_trim_ids'] ?? []));
         }, 3);
+
+        Cache::forget('api:v1:home:payload');
+        CatalogEvents::broadcast('App settings updated');
 
         Notification::make()
             ->title('Settings updated and synced successfully!')
@@ -270,18 +242,24 @@ class AppSettingsPage extends Page implements HasForms
     private function normaliseTimes(array $times): array
     {
         return collect($times)
+            ->filter()
             ->map(function (mixed $time): string {
                 $value = trim((string) $time);
                 try {
-                    return \Carbon\Carbon::createFromFormat('g:i A', strtoupper($value))->format('g:i A');
+                    $carbon = str_contains(strtoupper($value), 'AM') || str_contains(strtoupper($value), 'PM')
+                        ? \Carbon\Carbon::createFromFormat('g:i A', strtoupper($value))
+                        : \Carbon\Carbon::createFromFormat('H:i', $value);
+
+                    return $carbon->format('g:i A');
                 } catch (\Throwable) {
-                    throw \Illuminate\Validation\ValidationException::withMessages([
-                        'data.test_drive_times' => "Invalid time '{$value}'. Use a format like 10:00 AM.",
-                    ]);
+                    return $value;
                 }
             })
             ->unique()
-            ->sortBy(fn (string $time): int => (int) \Carbon\Carbon::createFromFormat('g:i A', $time)->format('Hi'))
+            ->sortBy(function (string $time): int {
+                $ts = strtotime($time);
+                return $ts !== false ? (int) date('Hi', $ts) : 0;
+            })
             ->values()
             ->all();
     }
@@ -310,68 +288,5 @@ class AppSettingsPage extends Page implements HasForms
         }
 
         return $options;
-    }
-
-    /** @return array<int, string> */
-    private static function searchVehicles(string $search): array
-    {
-        return Vehicle::query()
-            ->where('active', true)
-            ->where(function ($query) use ($search): void {
-                $query->where('model', 'like', "%{$search}%")
-                    ->orWhere('model_ar', 'like', "%{$search}%")
-                    ->orWhereHas('brand', fn ($brand) => $brand
-                        ->where('name', 'like', "%{$search}%")
-                        ->orWhere('name_ar', 'like', "%{$search}%"));
-            })
-            ->with('brand')->orderBy('model')->limit(30)->get()
-            ->mapWithKeys(fn (Vehicle $vehicle): array => [
-                $vehicle->id => trim(($vehicle->brand?->name ?? '').' — '.$vehicle->model.' ('.$vehicle->year.')'),
-            ])->all();
-    }
-
-    /** @return array<int, string> */
-    private static function vehicleLabels(array $values): array
-    {
-        return Vehicle::with('brand')->where('active', true)->whereIn('id', $values)->get()
-            ->mapWithKeys(fn (Vehicle $vehicle): array => [
-                $vehicle->id => trim(($vehicle->brand?->name ?? '').' — '.$vehicle->model.' ('.$vehicle->year.')'),
-            ])->all();
-    }
-
-    /** @return array<int, string> */
-    private static function searchTrims(string $search): array
-    {
-        return Trim::query()->with('vehicle.brand')->where('active', true)
-            ->whereHas('vehicle', fn ($vehicle) => $vehicle->where('active', true))
-            ->where(function ($query) use ($search): void {
-                $query->where('name', 'like', "%{$search}%")
-                    ->orWhere('name_ar', 'like', "%{$search}%")
-                    ->orWhereHas('vehicle', fn ($vehicle) => $vehicle
-                        ->where('model', 'like', "%{$search}%")
-                        ->orWhere('model_ar', 'like', "%{$search}%"));
-            })
-            ->limit(30)->get()
-            ->mapWithKeys(fn (Trim $trim): array => [$trim->id => self::formatTrimLabel($trim)])
-            ->all();
-    }
-
-    private static function trimLabel(mixed $value): ?string
-    {
-        $trim = Trim::with('vehicle.brand')->where('active', true)->find($value);
-        return $trim ? self::formatTrimLabel($trim) : null;
-    }
-
-    /** @return array<int, string> */
-    private static function trimLabels(array $values): array
-    {
-        return Trim::with('vehicle.brand')->where('active', true)->whereIn('id', $values)->get()
-            ->mapWithKeys(fn (Trim $trim): array => [$trim->id => self::formatTrimLabel($trim)])
-            ->all();
-    }
-
-    private static function formatTrimLabel(Trim $trim): string
-    {
-        return trim(($trim->vehicle?->brand?->name ?? '').' — '.($trim->vehicle?->model ?? '').' — '.$trim->name);
     }
 }

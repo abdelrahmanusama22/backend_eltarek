@@ -112,23 +112,31 @@ class TrimForm
                     ->columns(2),
 
                 Section::make('Gallery (صور الفئة)')
+                    ->description('Upload vehicle photos for the mobile app gallery slider.')
                     ->schema([
                         FileUpload::make('gallery')
-                            ->label('Trim Images (الصور)')
+                            ->label('Trim Gallery Images (صور المعرض)')
                             ->multiple()
                             ->image()
                             ->disk('public')
                             ->directory('vehicles/gallery')
+                            ->maxSize(5120)
+                            ->maxFiles(20)
                             ->reorderable()
+                            ->appendFiles()
                             ->columnSpanFull(),
                     ]),
 
                 Section::make('Highlights (أهم المواصفات السريعة)')
+                    ->description('Promotional highlights shown as chips in mobile car card (e.g. Engine, Transmission, Safety).')
                     ->schema([
                         Repeater::make('highlights')
+                            ->label('Key Highlights (أبرز المميزات)')
+                            ->addActionLabel('Add Highlight (إضافة ميزة)')
+                            ->defaultItems(0)
                             ->schema([
                                 Select::make('icon')
-                                    ->label('Icon')
+                                    ->label('Icon (الأيقونة)')
                                     ->options([
                                         'engine' => 'Engine (محرك)',
                                         'transmission' => 'Transmission (ناقل حركة)',
@@ -140,13 +148,18 @@ class TrimForm
                                     ->default('engine')
                                     ->required(),
                                 TextInput::make('label')
-                                    ->label('Label (EN)')
+                                    ->label('Label EN (الوصف انجليزي)')
+                                    ->placeholder('e.g. 1600 CC TURBO')
                                     ->required(),
                                 TextInput::make('label_ar')
-                                    ->label('Label (AR)')
+                                    ->label('Label AR (الوصف عربي)')
+                                    ->placeholder('مثال: ١٦٠٠ سي سي تيربو')
                                     ->required(),
                             ])
                             ->columns(3)
+                            ->reorderable()
+                            ->cloneable()
+                            ->collapsible()
                             ->columnSpanFull(),
                     ]),
 
@@ -164,6 +177,7 @@ class TrimForm
                                             ])->columns(3),
                                         Repeater::make('specs.tech.custom_tech')
                                             ->label('Custom Tech Specs')
+                                            ->defaultItems(0)
                                             ->schema([
                                                 TextInput::make('label')->required(),
                                                 TextInput::make('label_ar')->required(),
@@ -180,6 +194,7 @@ class TrimForm
                                             ])->columns(2),
                                         Repeater::make('specs.safety.custom_safety')
                                             ->label('Custom Safety Specs')
+                                            ->defaultItems(0)
                                             ->schema([
                                                 TextInput::make('label')->required(),
                                                 TextInput::make('label_ar')->required(),
@@ -196,6 +211,7 @@ class TrimForm
                                             ])->columns(2),
                                         Repeater::make('specs.interior.custom_interior')
                                             ->label('Custom Interior Specs')
+                                            ->defaultItems(0)
                                             ->schema([
                                                 TextInput::make('label')->required(),
                                                 TextInput::make('label_ar')->required(),
@@ -212,6 +228,7 @@ class TrimForm
                                             ])->columns(2),
                                         Repeater::make('specs.exterior.custom_exterior')
                                             ->label('Custom Exterior Specs')
+                                            ->defaultItems(0)
                                             ->schema([
                                                 TextInput::make('label')->required(),
                                                 TextInput::make('label_ar')->required(),

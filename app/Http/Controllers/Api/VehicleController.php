@@ -150,7 +150,7 @@ class VehicleController extends ApiController
 
     private function vehicleListItem(Vehicle $vehicle): array
     {
-        return array_merge($vehicle->toApi(), [
+        return array_merge($vehicle->toApi(includeTrims: false), [
             'brand' => $vehicle->brand?->toApi() ?? ['id' => $vehicle->brand_id, 'name' => ''],
             'trims_count' => $vehicle->trims->count(),
             'primary_trim_id' => $vehicle->trims->first()?->id,

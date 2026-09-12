@@ -26,14 +26,16 @@ class BranchController extends ApiController
             $query->where('city_id', $cityId);
         }
 
-        $branches = $query->get();
-
-        if ($q = $request->string('q')->toString()) {
-            $branches = $branches->filter(fn (Branch $b) => str_contains(strtolower($b->name), strtolower($q))
-                || str_contains($b->name_ar, $q)
-                || str_contains(strtolower($b->address), strtolower($q))
-                || str_contains($b->address_ar, $q))->values();
+        if ($q = trim($request->string('q')->toString())) {
+            $query->where(function ($sub) use ($q) {
+                $sub->where('name', 'like', "%{$q}%")
+                    ->orWhere('name_ar', 'like', "%{$q}%")
+                    ->orWhere('address', 'like', "%{$q}%")
+                    ->orWhere('address_ar', 'like', "%{$q}%");
+            });
         }
+
+        $branches = $query->get();
 
         if ($lat !== null && $lng !== null) {
             $branches = $branches->sortBy(fn (Branch $b) => $b->distanceKm($lat, $lng))->values();

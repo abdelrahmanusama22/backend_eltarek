@@ -69,11 +69,17 @@ class BranchForm
                         Hidden::make('timezone')->default('Africa/Cairo'),
                         Select::make('services')
                             ->multiple()
+                            ->searchable()
+                            ->preload()
                             ->options([
-                                'sales' => 'مبيعات',
-                                'maintenance' => 'صيانة',
-                                'spare_parts' => 'قطع غيار',
-                                'customer_service' => 'خدمة عملاء',
+                                'Showroom' => 'معرض (Showroom)',
+                                'Test Drive' => 'تجربة قيادة (Test Drive)',
+                                'Finance Center' => 'خدمات التمويل (Finance Center)',
+                                'Service & Maintenance' => 'صيانة وخدمة (Service & Maintenance)',
+                                'sales' => 'مبيعات (Sales)',
+                                'maintenance' => 'صيانة (Maintenance)',
+                                'spare_parts' => 'قطع غيار (Spare Parts)',
+                                'customer_service' => 'خدمة عملاء (Customer Service)',
                             ])
                             ->label('الخدمات المقدمة')
                             ->columnSpanFull(),
@@ -88,13 +94,12 @@ class BranchForm
                             ->label('الموقع (قم بسحب الدبوس لتحديد المكان)')
                             ->columnSpanFull()
                             ->defaultLocation(30.0444, 31.2357)
-                            ->afterStateUpdated(function (Get $get, Set $set, ?array $state): void {
+                            ->afterStateUpdated(function ($set, ?array $state = null): void {
                                 if (is_array($state) && isset($state['lat'], $state['lng'])) {
                                     $set('lat', (float) $state['lat']);
                                     $set('lng', (float) $state['lng']);
                                 }
                             })
-                            ->liveLocation(true, true, 5000)
                             ->showMarker()
                             ->markerColor('#E01B22')
                             ->showFullscreenControl()

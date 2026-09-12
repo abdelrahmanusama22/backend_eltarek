@@ -80,16 +80,26 @@ class Trim extends Model
     {
         $gallery = $this->gallery ?? [];
 
-        return array_map(function ($path) {
-            if (str_starts_with($path, 'http')) {
+        return array_values(array_map(function ($path) {
+            if (empty($path)) {
+                return '';
+            }
+            if (str_starts_with($path, 'http://') || str_starts_with($path, 'https://')) {
                 return $path;
             }
-            if (str_starts_with($path, 'assets/')) {
-                return url($path);
+            $clean = ltrim((string) $path, '/');
+            if (str_starts_with($clean, 'storage/')) {
+                $clean = substr($clean, 8);
+            }
+            if (str_starts_with($clean, 'media/')) {
+                $clean = substr($clean, 6);
+            }
+            if (str_starts_with($clean, 'assets/')) {
+                return '/'.$clean;
             }
 
-            return url('/media/'.$path);
-        }, $gallery);
+            return '/media/'.$clean;
+        }, array_filter((array) $gallery)));
     }
 
     /**

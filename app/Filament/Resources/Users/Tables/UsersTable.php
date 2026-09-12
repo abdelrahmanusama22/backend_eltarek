@@ -32,6 +32,9 @@ class UsersTable
                 ImageColumn::make('avatar_url')->label('Photo')->circular()->disk('public'),
                 TextColumn::make('name')
                     ->searchable(),
+                TextColumn::make('email')
+                    ->searchable()
+                    ->copyable(),
                 TextColumn::make('phone')
                     ->searchable(),
                 TextColumn::make('points')

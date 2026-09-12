@@ -43,10 +43,10 @@ class Vehicle extends Model
     }
 
     /**
-     * Resolve image_url to a full public URL regardless of how it was stored.
-     * - Already a full URL → return as-is
-     * - Stored via FileUpload (e.g. "vehicles/abc.jpg") → Storage::url()
-     * - Legacy assets path → prefix with APP_URL
+     * Resolve image_url to a standardized relative path or external URL.
+     * - Already a full URL (http/https) → return as-is
+     * - Stored via FileUpload or seeder → return relative /media/... path
+     * - Legacy assets path → return relative /assets/... path
      */
     public function getResolvedImageUrlAttribute(): ?string
     {
@@ -54,17 +54,24 @@ class Vehicle extends Model
         if (! $path) {
             return null;
         }
-        if (str_starts_with($path, 'http')) {
+        if (str_starts_with($path, 'http://') || str_starts_with($path, 'https://')) {
             return $path;
         }
-        if (str_starts_with($path, 'assets/')) {
-            return url($path);
+        $clean = ltrim((string) $path, '/');
+        if (str_starts_with($clean, 'storage/')) {
+            $clean = substr($clean, 8);
+        }
+        if (str_starts_with($clean, 'media/')) {
+            $clean = substr($clean, 6);
+        }
+        if (str_starts_with($clean, 'assets/')) {
+            return '/'.$clean;
         }
 
-        return url('/media/'.$path);
+        return '/media/'.$clean;
     }
 
-    public function toApi(): array
+    public function toApi(bool $includeTrims = true): array
     {
         return [
             'id' => $this->id,
@@ -78,7 +85,7 @@ class Vehicle extends Model
             'engine_summary' => $this->engine_summary,
             'monthly_from_egp' => $this->monthly_from_egp,
             'badge' => $this->badge,
-            'trims' => $this->relationLoaded('trims')
+            'trims' => ($includeTrims && $this->relationLoaded('trims'))
                                         ? $this->trims->map->toApi()->values()->toArray()
                                         : [],
         ];

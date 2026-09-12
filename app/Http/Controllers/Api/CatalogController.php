@@ -27,9 +27,9 @@ class CatalogController extends ApiController
     public function vehicles(Request $request): JsonResponse
     {
         $limit = min(100, max(10, $request->integer('limit', 50)));
-        $page = Vehicle::where('active', true)->orderBy('id')->cursorPaginate($limit);
+        $page = Vehicle::with('trims')->where('active', true)->orderBy('id')->cursorPaginate($limit);
 
-        return $this->ok(collect($page->items())->map->toApi()->values()->all(), meta: [
+        return $this->ok(collect($page->items())->map(fn (Vehicle $v) => $v->toApi(includeTrims: false))->values()->all(), meta: [
             'catalog_version' => CatalogEvents::version(),
             'next_cursor' => $page->nextCursor()?->encode(),
             'has_more' => $page->hasMorePages(),

@@ -34,12 +34,36 @@ class Branch extends Model
         static::restored(fn () => CatalogEvents::broadcast('Branches updated'));
     }
 
+    public function getResolvedImageUrlAttribute(): ?string
+    {
+        $path = $this->image;
+        if (! $path) {
+            return null;
+        }
+        if (str_starts_with($path, 'http://') || str_starts_with($path, 'https://')) {
+            return $path;
+        }
+        $clean = ltrim((string) $path, '/');
+        if (str_starts_with($clean, 'storage/')) {
+            $clean = substr($clean, 8);
+        }
+        if (str_starts_with($clean, 'media/')) {
+            $clean = substr($clean, 6);
+        }
+        if (str_starts_with($clean, 'assets/')) {
+            return '/'.$clean;
+        }
+
+        return '/media/'.$clean;
+    }
+
     public function toApi(?float $lat = null, ?float $lng = null): array
     {
         $data = [
             'id' => $this->id,
             'city_id' => $this->city_id,
-            'image' => $this->image ? asset('storage/'.$this->image) : null,
+            'image' => $this->resolved_image_url,
+            'image_url' => $this->resolved_image_url,
             'name' => $this->name,
             'name_ar' => $this->name_ar,
             'address' => $this->address,

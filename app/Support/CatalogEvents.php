@@ -24,7 +24,7 @@ final class CatalogEvents
     {
         if (! self::$suppressed) {
             Cache::forever('catalog:version', now()->format('YmdHis').'-'.Str::lower(Str::random(8)));
-            Cache::forget('api:v1:bootstrap:public:v2');
+            Cache::forget('api:v1:home:payload');
             event(new CatalogUpdated($message));
         }
     }

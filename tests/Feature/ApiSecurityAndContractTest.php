@@ -34,20 +34,6 @@ class ApiSecurityAndContractTest extends TestCase
         $this->assertNotEmpty($response->headers->get('X-Request-Id'));
     }
 
-    public function test_bootstrap_catalog_sections_are_json_arrays(): void
-    {
-        $this->catalogRecords();
-
-        $response = $this->getJson('/api/v1/bootstrap')->assertOk();
-        $response->assertJsonStructure([
-            'data' => ['brands', 'vehicles', 'trims', 'cities', 'branches'],
-        ]);
-        $this->assertIsArray($response->json('data.brands'));
-        $this->assertIsArray($response->json('data.vehicles'));
-        $this->assertIsArray($response->json('data.trims'));
-        $this->assertArrayHasKey('id', $response->json('data.brands.0'));
-    }
-
     public function test_catalog_endpoints_are_versioned_and_paginated(): void
     {
         $this->catalogRecords();
