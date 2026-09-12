@@ -19,7 +19,7 @@ class HomeControllerCacheTest extends TestCase
 
     public function test_home_endpoint_caches_payload_and_serves_from_cache(): void
     {
-        Cache::forget(HomeController::CACHE_KEY);
+        Cache::forget(HomeController::cacheKey());
 
         $brand = Brand::create([
             'name' => 'Mercedes-Benz',
@@ -56,8 +56,8 @@ class HomeControllerCacheTest extends TestCase
         AppSetting::put('budget_pick_trim_ids', [$trim->id]);
 
         // Ensure cache is clear before first request
-        Cache::forget(HomeController::CACHE_KEY);
-        $this->assertFalse(Cache::has(HomeController::CACHE_KEY));
+        Cache::forget(HomeController::cacheKey());
+        $this->assertFalse(Cache::has(HomeController::cacheKey()));
 
         // 1. First request should populate cache
         $firstResponse = $this->getJson('/api/v1/home');
@@ -66,8 +66,8 @@ class HomeControllerCacheTest extends TestCase
             ->assertJsonPath('data.heroes.0.id', $vehicle->id)
             ->assertJsonPath('data.brands.0.id', $brand->id);
 
-        $this->assertTrue(Cache::has(HomeController::CACHE_KEY));
-        $cachedData = Cache::get(HomeController::CACHE_KEY);
+        $this->assertTrue(Cache::has(HomeController::cacheKey()));
+        $cachedData = Cache::get(HomeController::cacheKey());
         $this->assertIsArray($cachedData);
         $this->assertNotEmpty($cachedData['heroes']);
 
@@ -82,6 +82,7 @@ class HomeControllerCacheTest extends TestCase
         // Since payload is cached, no queries should touch vehicles, brands, or trims
         $tableQueries = collect($queries)->filter(function ($q) {
             $sql = strtolower($q['query']);
+
             return str_contains($sql, 'vehicles') || str_contains($sql, 'brands') || str_contains($sql, 'trims');
         });
         $this->assertCount(0, $tableQueries, 'Cached home response should execute 0 queries on vehicles, brands, or trims');
@@ -105,5 +106,16 @@ class HomeControllerCacheTest extends TestCase
         CatalogEvents::broadcast('Test update');
 
         $this->assertFalse(Cache::has(HomeController::CACHE_KEY), 'CatalogEvents::broadcast must invalidate home payload cache');
+    }
+
+    public function test_catalog_change_uses_a_new_home_cache_key_without_dashboard_save(): void
+    {
+        $oldKey = HomeController::cacheKey();
+        Cache::put($oldKey, ['heroes' => []], 3600);
+
+        CatalogEvents::broadcast('Vehicle changed');
+
+        $this->assertNotSame($oldKey, HomeController::cacheKey());
+        $this->assertFalse(Cache::has(HomeController::cacheKey()));
     }
 }

@@ -6,6 +6,7 @@ use App\Models\AppSetting;
 use App\Models\Brand;
 use App\Models\Trim;
 use App\Models\Vehicle;
+use App\Support\CatalogEvents;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
@@ -16,9 +17,14 @@ class HomeController extends ApiController
 
     public const CACHE_TTL_SECONDS = 3600;
 
+    public static function cacheKey(): string
+    {
+        return self::CACHE_KEY.':'.CatalogEvents::version();
+    }
+
     public function index(Request $request): JsonResponse
     {
-        $payload = Cache::remember(self::CACHE_KEY, now()->addSeconds(self::CACHE_TTL_SECONDS), function () {
+        $payload = Cache::remember(self::cacheKey(), now()->addSeconds(self::CACHE_TTL_SECONDS), function () {
             $heroIds = Vehicle::where('active', true)
                 ->whereIn('id', AppSetting::get('home_hero_vehicle_ids', []))
                 ->pluck('id')->values();
@@ -59,6 +65,7 @@ class HomeController extends ApiController
                 ->values()
                 ->map(function ($trim) use ($configuredMatches) {
                     $configured = $configuredMatches->firstWhere('trim_id', $trim->id);
+
                     return [
                         'match_percentage' => (int) ($configured['match_percentage'] ?? 0),
                         'trim' => [
@@ -114,6 +121,7 @@ class HomeController extends ApiController
                 ->all();
 
             return [
+                'catalog_version' => CatalogEvents::version(),
                 'heroes' => $heroes,
                 'brands' => $brands,
                 'smart_matches' => $smartMatches,
