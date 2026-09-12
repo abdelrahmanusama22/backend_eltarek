@@ -15,7 +15,7 @@ class AppSetting extends Model
 
     public $incrementing = false;
 
-    protected $guarded = [];
+    protected $fillable = ['key', 'value'];
 
     protected $casts = ['value' => 'array'];
 

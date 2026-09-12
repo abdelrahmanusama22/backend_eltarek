@@ -5,14 +5,12 @@ namespace App\Filament\Resources\Branches\Schemas;
 use Dotswan\MapPicker\Fields\Map;
 use Filament\Forms\Components\FileUpload;
 use Filament\Forms\Components\Hidden;
+use Filament\Forms\Components\Repeater;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
-use Filament\Forms\Components\Repeater;
 use Filament\Forms\Components\TimePicker;
 use Filament\Forms\Components\Toggle;
 use Filament\Schemas\Components\Section;
-use Filament\Schemas\Components\Utilities\Get;
-use Filament\Schemas\Components\Utilities\Set;
 use Filament\Schemas\Schema;
 
 class BranchForm
@@ -52,20 +50,31 @@ class BranchForm
                             ->hint('اتركه فارغاً إذا كان هو نفس رقم الهاتف'),
                         TextInput::make('address')->label('العنوان (English)')->required()->columnSpanFull(),
                         TextInput::make('address_ar')->label('العنوان (Arabic)')->required()->columnSpanFull(),
-                        TextInput::make('hours')->label('مواعيد العمل (English)')->required(),
-                        TextInput::make('hours_ar')->label('مواعيد العمل (Arabic)')->required(),
+                        Hidden::make('hours')->default(''),
+                        Hidden::make('hours_ar')->default(''),
                         Repeater::make('opening_hours')
                             ->label('جدول العمل الأسبوعي')
                             ->helperText('هذا الجدول يحسب حالة مفتوح/مغلق في التطبيق تلقائياً حسب توقيت القاهرة.')
                             ->schema([
                                 Select::make('day')->label('اليوم')->options([
-                                    'sat'=>'السبت','sun'=>'الأحد','mon'=>'الاثنين','tue'=>'الثلاثاء',
-                                    'wed'=>'الأربعاء','thu'=>'الخميس','fri'=>'الجمعة',
+                                    'sat' => 'السبت', 'sun' => 'الأحد', 'mon' => 'الاثنين', 'tue' => 'الثلاثاء',
+                                    'wed' => 'الأربعاء', 'thu' => 'الخميس', 'fri' => 'الجمعة',
                                 ])->required()->disableOptionsWhenSelectedInSiblingRepeaterItems(),
                                 TimePicker::make('open')->label('يفتح')->seconds(false),
                                 TimePicker::make('close')->label('يغلق')->seconds(false),
                                 Toggle::make('closed')->label('مغلق طوال اليوم')->default(false),
-                            ])->columns(4)->reorderable(false)->columnSpanFull(),
+                            ])
+                            ->default([
+                                ['day' => 'sat', 'open' => '09:00', 'close' => '22:00', 'closed' => false],
+                                ['day' => 'sun', 'open' => '09:00', 'close' => '22:00', 'closed' => false],
+                                ['day' => 'mon', 'open' => '09:00', 'close' => '22:00', 'closed' => false],
+                                ['day' => 'tue', 'open' => '09:00', 'close' => '22:00', 'closed' => false],
+                                ['day' => 'wed', 'open' => '09:00', 'close' => '22:00', 'closed' => false],
+                                ['day' => 'thu', 'open' => '09:00', 'close' => '22:00', 'closed' => false],
+                                ['day' => 'fri', 'open' => '09:00', 'close' => '22:00', 'closed' => true],
+                            ])
+                            ->required()->minItems(7)->maxItems(7)
+                            ->columns(4)->reorderable(false)->addable(false)->deletable(false)->columnSpanFull(),
                         Hidden::make('timezone')->default('Africa/Cairo'),
                         Select::make('services')
                             ->multiple()
@@ -83,7 +92,7 @@ class BranchForm
                             ])
                             ->label('الخدمات المقدمة')
                             ->columnSpanFull(),
-                        Toggle::make('is_open')->label('مفتوح الآن (احتياطي عند عدم إدخال جدول أسبوعي)')->required(),
+                        Hidden::make('is_open')->default(false),
                         Toggle::make('active')->label('مفعل')->required(),
                     ])->columns(2),
 

@@ -29,6 +29,14 @@ class Branch extends Model
 
     protected static function booted(): void
     {
+        static::saving(function (Branch $branch): void {
+            if (! $branch->hours) {
+                $branch->hours = $branch->scheduleSummary();
+            }
+            if (! $branch->hours_ar) {
+                $branch->hours_ar = $branch->hours;
+            }
+        });
         static::saved(fn () => CatalogEvents::broadcast('Branches updated'));
         static::deleted(fn () => CatalogEvents::broadcast('Branches updated'));
         static::restored(fn () => CatalogEvents::broadcast('Branches updated'));
@@ -59,6 +67,7 @@ class Branch extends Model
 
     public function toApi(?float $lat = null, ?float $lng = null): array
     {
+        $todayHours = $this->todayHours();
         $data = [
             'id' => $this->id,
             'city_id' => $this->city_id,
@@ -70,8 +79,9 @@ class Branch extends Model
             'address_ar' => $this->address_ar,
             'phone' => $this->phone,
             'whatsapp' => $this->whatsapp ?: $this->phone,
-            'hours' => $this->hours,
-            'hours_ar' => $this->hours_ar,
+            'hours' => $todayHours ?? $this->hours,
+            'hours_ar' => $todayHours ?? $this->hours_ar,
+            'today_hours' => $todayHours,
             'is_open' => $this->isOpenNow(),
             'lat' => $this->lat,
             'lng' => $this->lng,
@@ -86,17 +96,82 @@ class Branch extends Model
 
     public function isOpenNow(): bool
     {
-        if (empty($this->opening_hours)) return (bool) $this->is_open;
+        if (empty($this->opening_hours)) {
+            return (bool) $this->is_open;
+        }
         $now = now($this->timezone ?: 'Africa/Cairo');
+        if ($this->isBlockedDate($now->toDateString())) {
+            return false;
+        }
+
+        foreach ([$now, $now->copy()->subDay()] as $slotDate) {
+            $day = strtolower($slotDate->format('D'));
+            foreach ($this->opening_hours as $slot) {
+                if (($slot['day'] ?? null) !== $day || ($slot['closed'] ?? false)) {
+                    continue;
+                }
+                $open = $slotDate->copy()->setTimeFromTimeString($slot['open'] ?? '00:00');
+                $close = $slotDate->copy()->setTimeFromTimeString($slot['close'] ?? '00:00');
+                if ($close->lessThanOrEqualTo($open)) {
+                    $close->addDay();
+                }
+                if ($now->betweenIncluded($open, $close)) {
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    }
+
+    public function todayHours(): ?string
+    {
+        if (empty($this->opening_hours)) {
+            return null;
+        }
+        $now = now($this->timezone ?: 'Africa/Cairo');
+        if ($this->isBlockedDate($now->toDateString())) {
+            return 'Closed';
+        }
         $day = strtolower($now->format('D'));
         foreach ($this->opening_hours as $slot) {
-            if (($slot['day'] ?? null) !== $day || ($slot['closed'] ?? false)) continue;
-            $open = $now->copy()->setTimeFromTimeString($slot['open'] ?? '00:00');
-            $close = $now->copy()->setTimeFromTimeString($slot['close'] ?? '00:00');
-            if ($close->lessThanOrEqualTo($open)) $close->addDay();
-            if ($now->betweenIncluded($open, $close)) return true;
+            if (($slot['day'] ?? null) !== $day) {
+                continue;
+            }
+            if ($slot['closed'] ?? false) {
+                return 'Closed';
+            }
+            $open = $slot['open'] ?? null;
+            $close = $slot['close'] ?? null;
+            if (! $open || ! $close) {
+                return 'Closed';
+            }
+
+            return now()->setTimeFromTimeString($open)->format('g:i A').' - '.now()->setTimeFromTimeString($close)->format('g:i A');
         }
-        return false;
+
+        return 'Closed';
+    }
+
+    private function scheduleSummary(): string
+    {
+        foreach ($this->opening_hours ?? [] as $slot) {
+            if (($slot['closed'] ?? false) || empty($slot['open']) || empty($slot['close'])) {
+                continue;
+            }
+
+            return now()->setTimeFromTimeString($slot['open'])->format('g:i A').' - '
+                .now()->setTimeFromTimeString($slot['close'])->format('g:i A');
+        }
+
+        return 'Closed';
+    }
+
+    private function isBlockedDate(string $date): bool
+    {
+        return collect(AppSetting::get('blocked_dates', []))->contains(
+            fn ($item) => is_array($item) && ($item['date'] ?? null) === $date
+        );
     }
 
     /** Haversine distance in km. */

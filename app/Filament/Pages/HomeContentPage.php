@@ -5,7 +5,9 @@ namespace App\Filament\Pages;
 use App\Models\AppSetting;
 use App\Models\Trim;
 use App\Models\Vehicle;
+use App\Support\CatalogEvents;
 use BackedEnum;
+use BezhanSalleh\FilamentShield\Traits\HasPageShield;
 use Filament\Forms\Components\Repeater;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
@@ -20,7 +22,7 @@ use Illuminate\Support\Facades\DB;
 
 class HomeContentPage extends Page implements HasForms
 {
-    use InteractsWithForms;
+    use HasPageShield, InteractsWithForms;
 
     protected string $view = 'filament.pages.home-content-page';
 
@@ -101,6 +103,8 @@ class HomeContentPage extends Page implements HasForms
             AppSetting::put('budget_pick_trim_ids', array_map('intval', $data['budget_trim_ids'] ?? []));
         }, 3);
 
+        CatalogEvents::broadcast('Home content updated');
+
         Notification::make()->title('Home content updated successfully')->success()->send();
     }
 
@@ -139,6 +143,7 @@ class HomeContentPage extends Page implements HasForms
     private static function trimLabel(mixed $value): ?string
     {
         $trim = Trim::with('vehicle.brand')->where('active', true)->find($value);
+
         return $trim ? self::trimText($trim) : null;
     }
 
