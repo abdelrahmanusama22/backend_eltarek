@@ -1,5 +1,7 @@
 # Production operations
 
+Use PHP 8.4 or newer; the locked `spatie/laravel-activitylog` version requires it.
+
 Required long-running processes:
 
 ```text
