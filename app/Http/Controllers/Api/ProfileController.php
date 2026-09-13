@@ -50,14 +50,41 @@ class ProfileController extends ApiController
 
     public function uploadAvatar(Request $request): JsonResponse
     {
-        $request->validate([
-            'avatar' => ['required', 'image', 'mimes:jpg,jpeg,png,webp', 'max:5120', 'dimensions:min_width=128,min_height=128,max_width=5000,max_height=5000'],
-        ]);
+        if ($request->has('avatar_base64')) {
+            $request->validate(['avatar_base64' => ['required', 'string', 'max:12000000']]);
+            $raw = (string) $request->input('avatar_base64');
+            if (preg_match('/^data:image\/\w+;base64,/', $raw)) {
+                $raw = substr($raw, strpos($raw, ',') + 1);
+            }
+            $bytes = base64_decode(preg_replace('/\s+/', '', $raw), true);
+            $dimensions = $bytes === false ? false : @getimagesizefromstring($bytes);
+            $allowedMimes = [
+                'image/jpeg' => 'jpg',
+                'image/jpg' => 'jpg',
+                'image/png' => 'png',
+                'image/webp' => 'webp',
+            ];
+            $mime = $dimensions !== false ? ($dimensions['mime'] ?? '') : '';
+            if ($bytes === false || strlen($bytes) > 5 * 1024 * 1024
+                || $dimensions === false || ! array_key_exists($mime, $allowedMimes)
+                || $dimensions[0] > 5000 || $dimensions[1] > 5000) {
+                return $this->fail('Please choose a valid image (JPEG, PNG, or WEBP) under 5 MB.', 422);
+            }
+            $ext = $allowedMimes[$mime] ?? 'jpg';
+            $path = 'avatars/'.Str::uuid().'.'.$ext;
+            if (! Storage::disk('public')->put($path, $bytes)) {
+                return $this->fail('Could not save profile photo.', 500);
+            }
+        } else {
+            $request->validate([
+                'avatar' => ['required', 'image', 'mimes:jpg,jpeg,png,webp', 'max:5120', 'dimensions:max_width=5000,max_height=5000'],
+            ]);
+            $path = $request->file('avatar')->store('avatars', 'public');
+        }
         $user = $request->user();
         $oldPath = is_string($user->avatar_url) && str_starts_with($user->avatar_url, 'avatars/')
             ? $user->avatar_url
             : null;
-        $path = $request->file('avatar')->store('avatars', 'public');
         $user->update(['avatar_url' => $path]);
         if ($oldPath && $oldPath !== $path) {
             Storage::disk('public')->delete($oldPath);

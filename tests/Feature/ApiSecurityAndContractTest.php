@@ -103,10 +103,34 @@ class ApiSecurityAndContractTest extends TestCase
         Sanctum::actingAs($user);
 
         $response = $this->post('/api/v1/profile/avatar', [
-            'avatar' => UploadedFile::fake()->image('avatar.jpg', 400, 400),
+            'avatar' => UploadedFile::fake()->image('avatar.jpg', 64, 64),
         ])->assertOk();
 
         $this->assertStringStartsWith('/storage/avatars/', $response->json('data.avatar_url'));
+        Storage::disk('public')->assertExists($user->fresh()->avatar_url);
+    }
+
+    public function test_authenticated_user_can_upload_avatar_as_json_without_php_multipart(): void
+    {
+        Storage::fake('public');
+        $user = User::factory()->create(['is_active' => true]);
+        Sanctum::actingAs($user);
+        $jpeg = UploadedFile::fake()->image('avatar.jpg', 64, 64)->get();
+
+        $response = $this->postJson('/api/v1/profile/avatar', [
+            'avatar_base64' => base64_encode($jpeg),
+        ])->assertOk();
+
+        $this->assertStringStartsWith('/storage/avatars/', $response->json('data.avatar_url'));
+        Storage::disk('public')->assertExists($user->fresh()->avatar_url);
+
+        // Test PNG upload with data URI scheme
+        $png = UploadedFile::fake()->image('avatar.png', 64, 64)->get();
+        $responsePng = $this->postJson('/api/v1/profile/avatar', [
+            'avatar_base64' => 'data:image/png;base64,'.base64_encode($png),
+        ])->assertOk();
+
+        $this->assertStringEndsWith('.png', $responsePng->json('data.avatar_url'));
         Storage::disk('public')->assertExists($user->fresh()->avatar_url);
     }
 
