@@ -9,10 +9,8 @@ use App\Filament\Resources\Cities\RelationManagers\BranchesRelationManager;
 use App\Filament\Resources\Cities\Schemas\CityForm;
 use App\Filament\Resources\Cities\Tables\CitiesTable;
 use App\Models\City;
-use BackedEnum;
 use Filament\Resources\Resource;
 use Filament\Schemas\Schema;
-use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Table;
 
 class CityResource extends Resource
@@ -20,7 +18,6 @@ class CityResource extends Resource
     protected static ?string $model = City::class;
 
     protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-map-pin';
-
 
     public static function getNavigationGroup(): ?string
     {

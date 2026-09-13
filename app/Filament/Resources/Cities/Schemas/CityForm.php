@@ -3,6 +3,7 @@
 namespace App\Filament\Resources\Cities\Schemas;
 
 use Filament\Forms\Components\TextInput;
+use Filament\Schemas\Components\Section;
 use Filament\Schemas\Schema;
 
 class CityForm
@@ -11,7 +12,7 @@ class CityForm
     {
         return $schema
             ->components([
-                \Filament\Schemas\Components\Section::make('معلومات المدينة')
+                Section::make('معلومات المدينة')
                     ->description('أدخل بيانات المدينة وترتيبها')
                     ->schema([
                         TextInput::make('name')

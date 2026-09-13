@@ -11,14 +11,7 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::table('trims', function (Blueprint $table) {
-            $table->integer('total_price')->nullable();
-            $table->integer('booking_deposit')->nullable();
-            $table->integer('zero_interest_price')->nullable();
-            $table->integer('price_9pct')->nullable();
-            $table->json('colors')->nullable();
-            $table->text('financing_notes')->nullable();
-        });
+        // Columns are created by 2026_08_28_150559_add_import_fields_to_trims_table.
     }
 
     /**
@@ -26,15 +19,6 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::table('trims', function (Blueprint $table) {
-            $table->dropColumn([
-                'total_price',
-                'booking_deposit',
-                'zero_interest_price',
-                'price_9pct',
-                'colors',
-                'financing_notes'
-            ]);
-        });
+        // Compatibility no-op: do not remove columns owned by an earlier migration.
     }
 };

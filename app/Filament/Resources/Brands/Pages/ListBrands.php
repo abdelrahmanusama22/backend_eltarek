@@ -3,8 +3,9 @@
 namespace App\Filament\Resources\Brands\Pages;
 
 use App\Filament\Resources\Brands\BrandResource;
-use Filament\Resources\Pages\Page;
 use App\Models\Brand;
+use Filament\Resources\Pages\Page;
+use Illuminate\Contracts\Support\Htmlable;
 
 class ListBrands extends Page
 {
@@ -16,8 +17,8 @@ class ListBrands extends Page
     {
         return Brand::all();
     }
-    
-    public function getTitle(): string | \Illuminate\Contracts\Support\Htmlable
+
+    public function getTitle(): string|Htmlable
     {
         return '';
     }

@@ -2,13 +2,17 @@
 
 namespace App\Filament\Resources\Brands\Tables;
 
+use App\Filament\Exports\BrandExporter;
+use App\Filament\Resources\Trims\TrimResource;
+use Filament\Actions\Action;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteBulkAction;
 use Filament\Actions\EditAction;
+use Filament\Actions\ExportAction;
 use Filament\Tables\Columns\IconColumn;
 use Filament\Tables\Columns\TextColumn;
-use Filament\Tables\Table;
 use Filament\Tables\Filters\TrashedFilter;
+use Filament\Tables\Table;
 
 class BrandsTable
 {
@@ -48,20 +52,20 @@ class BrandsTable
                 TrashedFilter::make(),
             ])
             ->recordActions([
-                \Filament\Actions\EditAction::make(),
+                EditAction::make(),
             ])
             ->bulkActions([
-                \Filament\Actions\BulkActionGroup::make([
-                    \Filament\Actions\DeleteBulkAction::make(),
+                BulkActionGroup::make([
+                    DeleteBulkAction::make(),
                 ]),
             ])
             ->toolbarActions([
-                \Filament\Actions\ExportAction::make()
-                    ->exporter(\App\Filament\Exports\BrandExporter::class),
-                \Filament\Actions\Action::make('import')
+                ExportAction::make()
+                    ->exporter(BrandExporter::class),
+                Action::make('import')
                     ->label('Import / Update Catalog')
                     ->icon('heroicon-o-arrow-down-tray')
-                    ->url(fn () => \App\Filament\Resources\Trims\TrimResource::getUrl('import')),
+                    ->url(fn () => TrimResource::getUrl('import')),
             ]);
     }
 }

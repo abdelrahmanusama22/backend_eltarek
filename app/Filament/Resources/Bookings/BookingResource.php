@@ -2,7 +2,6 @@
 
 namespace App\Filament\Resources\Bookings;
 
-use App\Filament\Resources\Bookings\Pages\CreateBooking;
 use App\Filament\Resources\Bookings\Pages\EditBooking;
 use App\Filament\Resources\Bookings\Pages\ListBookings;
 use App\Filament\Resources\Bookings\Schemas\BookingForm;
@@ -13,16 +12,13 @@ use Filament\Resources\Resource;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Table;
+use Illuminate\Database\Eloquent\Builder;
 
 class BookingResource extends Resource
 {
-
-
-
     protected static ?string $model = Booking::class;
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedCalendarDays;
-
 
     public static function getNavigationGroup(): ?string
     {
@@ -39,7 +35,7 @@ class BookingResource extends Resource
         return BookingsTable::configure($table);
     }
 
-    public static function getEloquentQuery(): \Illuminate\Database\Eloquent\Builder
+    public static function getEloquentQuery(): Builder
     {
         return parent::getEloquentQuery()->with(['user', 'trim.vehicle', 'branch']);
     }
@@ -55,7 +51,6 @@ class BookingResource extends Resource
     {
         return [
             'index' => ListBookings::route('/'),
-            'create' => CreateBooking::route('/create'),
             'edit' => EditBooking::route('/{record}/edit'),
         ];
     }

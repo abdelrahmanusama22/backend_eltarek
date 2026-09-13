@@ -14,6 +14,10 @@ class AnalyticsController extends ApiController
      */
     public function log(Request $request): JsonResponse
     {
+        if ((int) $request->server('CONTENT_LENGTH', 0) > 131072) {
+            return $this->fail('Analytics payload is too large.', 413);
+        }
+
         $user = $request->user('sanctum');
         $ip = $request->ip();
         $device = $request->header('User-Agent') ?? $request->input('device_info');
@@ -25,7 +29,7 @@ class AnalyticsController extends ApiController
                 'events' => ['required', 'array', 'max:50'],
                 'events.*.event_name' => ['required', 'string', 'max:100'],
                 'events.*.category' => ['nullable', 'string', 'max:50'],
-                'events.*.properties' => ['nullable', 'array'],
+                'events.*.properties' => ['nullable', 'array', $this->propertiesSizeRule()],
                 'events.*.session_id' => ['nullable', 'string', 'max:100'],
                 'events.*.device_info' => ['nullable', 'string', 'max:255'],
             ]);
@@ -34,21 +38,23 @@ class AnalyticsController extends ApiController
             $now = now();
 
             foreach ($validated['events'] as $evt) {
-                if (empty($evt['event_name'])) continue;
+                if (empty($evt['event_name'])) {
+                    continue;
+                }
 
                 $records[] = [
-                    'user_id'     => $user?->id,
-                    'event_name'  => (string) $evt['event_name'],
-                    'category'    => $evt['category'] ?? 'general',
-                    'properties'  => isset($evt['properties']) ? json_encode($evt['properties']) : null,
-                    'session_id'  => $evt['session_id'] ?? $sessionId,
+                    'user_id' => $user?->id,
+                    'event_name' => (string) $evt['event_name'],
+                    'category' => $evt['category'] ?? 'general',
+                    'properties' => isset($evt['properties']) ? json_encode($evt['properties']) : null,
+                    'session_id' => $evt['session_id'] ?? $sessionId,
                     'device_info' => $evt['device_info'] ?? $device,
-                    'ip_address'  => $ip,
-                    'created_at'  => $now,
+                    'ip_address' => $ip,
+                    'created_at' => $now,
                 ];
             }
 
-            if (!empty($records)) {
+            if (! empty($records)) {
                 AnalyticsEvent::insert($records);
             }
 
@@ -58,21 +64,30 @@ class AnalyticsController extends ApiController
         // Handle single event
         $request->validate([
             'event_name' => ['required', 'string', 'max:100'],
-            'category'   => ['nullable', 'string', 'max:50'],
-            'properties' => ['nullable', 'array'],
+            'category' => ['nullable', 'string', 'max:50'],
+            'properties' => ['nullable', 'array', $this->propertiesSizeRule()],
         ]);
 
         $event = AnalyticsEvent::create([
-            'user_id'     => $user?->id,
-            'event_name'  => $request->string('event_name')->toString(),
-            'category'    => $request->input('category', 'general'),
-            'properties'  => $request->input('properties'),
-            'session_id'  => $sessionId,
+            'user_id' => $user?->id,
+            'event_name' => $request->string('event_name')->toString(),
+            'category' => $request->input('category', 'general'),
+            'properties' => $request->input('properties'),
+            'session_id' => $sessionId,
             'device_info' => $device,
-            'ip_address'  => $ip,
-            'created_at'  => now(),
+            'ip_address' => $ip,
+            'created_at' => now(),
         ]);
 
         return $this->ok(['event_id' => $event->id], 'Event recorded successfully.');
+    }
+
+    private function propertiesSizeRule(): \Closure
+    {
+        return static function (string $attribute, mixed $value, \Closure $fail): void {
+            if (strlen((string) json_encode($value)) > 8192) {
+                $fail("The {$attribute} field may not exceed 8 KB.");
+            }
+        };
     }
 }

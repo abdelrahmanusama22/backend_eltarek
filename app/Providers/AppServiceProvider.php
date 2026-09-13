@@ -2,9 +2,10 @@
 
 namespace App\Providers;
 
-use Illuminate\Support\ServiceProvider;
-
+use App\Models\Booking;
+use App\Observers\BookingObserver;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\ServiceProvider;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -21,7 +22,7 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
-        \App\Models\Booking::observe(\App\Observers\BookingObserver::class);
+        Booking::observe(BookingObserver::class);
 
         Gate::before(function ($user, $ability) {
             return $user->hasRole('super_admin') ? true : null;

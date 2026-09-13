@@ -25,9 +25,6 @@ class RewardResource extends Resource
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedGift;
 
-
-
-
     public static function form(Schema $schema): Schema
     {
         return RewardForm::configure($schema);

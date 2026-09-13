@@ -10,24 +10,31 @@ use App\Filament\Resources\OtpLogs\Tables\OtpLogsTable;
 use App\Models\OtpCode;
 use BackedEnum;
 use Filament\Resources\Resource;
-use Illuminate\Database\Eloquent\Model;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Table;
+use Illuminate\Database\Eloquent\Model;
 
 class OtpLogResource extends Resource
 {
+    public static function canCreate(): bool
+    {
+        return false;
+    }
 
+    public static function canEdit(Model $record): bool
+    {
+        return false;
+    }
 
-
-    public static function canCreate(): bool { return false; }
-    public static function canEdit(Model $record): bool { return false; }
-    public static function canDelete(Model $record): bool { return false; }
+    public static function canDelete(Model $record): bool
+    {
+        return false;
+    }
 
     protected static ?string $model = OtpCode::class;
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedKey;
-
 
     public static function getNavigationGroup(): ?string
     {

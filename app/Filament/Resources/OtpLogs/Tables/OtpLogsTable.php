@@ -3,8 +3,6 @@
 namespace App\Filament\Resources\OtpLogs\Tables;
 
 use Filament\Actions\BulkActionGroup;
-use Filament\Actions\DeleteBulkAction;
-use Filament\Actions\EditAction;
 use Filament\Tables\Columns\IconColumn;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
@@ -37,11 +35,11 @@ class OtpLogsTable
                 //
             ])
             ->recordActions([
-                
+
             ])
             ->toolbarActions([
                 BulkActionGroup::make([
-                    
+
                 ]),
             ]);
     }

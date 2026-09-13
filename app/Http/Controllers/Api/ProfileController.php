@@ -5,10 +5,13 @@ namespace App\Http\Controllers\Api;
 use App\Models\AppSetting;
 use App\Models\Reward;
 use App\Models\User;
+use App\Models\GarageLinkRequest;
+use App\Models\UserNotification;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use Illuminate\Support\Facades\Storage;
 
 class ProfileController extends ApiController
 {
@@ -45,19 +48,103 @@ class ProfileController extends ApiController
         return $this->ok($user->fresh()->load('city')->toApi(), 'Profile updated successfully.');
     }
 
+    public function uploadAvatar(Request $request): JsonResponse
+    {
+        if ($request->has('avatar_base64')) {
+            $request->validate(['avatar_base64' => ['required', 'string', 'max:12000000']]);
+            $raw = (string) $request->input('avatar_base64');
+            if (preg_match('/^data:image\/\w+;base64,/', $raw)) {
+                $raw = substr($raw, strpos($raw, ',') + 1);
+            }
+            $bytes = base64_decode(preg_replace('/\s+/', '', $raw), true);
+            $dimensions = $bytes === false ? false : @getimagesizefromstring($bytes);
+            $allowedMimes = [
+                'image/jpeg' => 'jpg',
+                'image/jpg' => 'jpg',
+                'image/png' => 'png',
+                'image/webp' => 'webp',
+            ];
+            $mime = $dimensions !== false ? ($dimensions['mime'] ?? '') : '';
+            if ($bytes === false || strlen($bytes) > 5 * 1024 * 1024
+                || $dimensions === false || ! array_key_exists($mime, $allowedMimes)
+                || $dimensions[0] > 5000 || $dimensions[1] > 5000) {
+                return $this->fail('Please choose a valid image (JPEG, PNG, or WEBP) under 5 MB.', 422);
+            }
+            $ext = $allowedMimes[$mime] ?? 'jpg';
+            $path = 'avatars/'.Str::uuid().'.'.$ext;
+            if (! Storage::disk('public')->put($path, $bytes)) {
+                return $this->fail('Could not save profile photo.', 500);
+            }
+        } else {
+            $request->validate([
+                'avatar' => ['required', 'image', 'mimes:jpg,jpeg,png,webp', 'max:5120', 'dimensions:max_width=5000,max_height=5000'],
+            ]);
+            $path = $request->file('avatar')->store('avatars', 'public');
+        }
+        $user = $request->user();
+        $oldPath = is_string($user->avatar_url) && str_starts_with($user->avatar_url, 'avatars/')
+            ? $user->avatar_url
+            : null;
+        $user->update(['avatar_url' => $path]);
+        if ($oldPath && $oldPath !== $path) {
+            Storage::disk('public')->delete($oldPath);
+        }
+
+        return $this->ok($user->fresh()->load('city')->toApi(), 'Profile photo updated.');
+    }
+
     public function garage(Request $request): JsonResponse
     {
-        return $this->ok($request->user()->garageCars()->get()->map->toApi());
+        return $this->ok(['items' => $request->user()->garageCars()->with(['vehicle', 'serviceRecords'])->latest()->get()->map->toApi()->values()]);
+    }
+
+    public function garageLinkRequests(Request $request): JsonResponse
+    {
+        return $this->ok(['items' => $request->user()->garageLinkRequests()->latest()->get()->map->toApi()->values()]);
+    }
+
+    public function requestGarageLink(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'identifier' => ['required','string','min:5','max:64','regex:/^(?:[A-HJ-NPR-Z0-9]{17}|[A-Z0-9-]{5,64})$/i'],
+            'car_name' => ['nullable','string','max:120'],
+        ]);
+        $identifier = Str::upper(trim($validated['identifier']));
+        if (\App\Models\GarageCar::where('tracking_code', $identifier)->where('user_id', '!=', $request->user()->id)->exists()) {
+            return $this->fail('This vehicle is already linked to another account.', 409);
+        }
+        if ($request->user()->garageCars()->where('tracking_code', $identifier)->exists()) {
+            return $this->fail('This vehicle is already in your garage.', 409);
+        }
+        $existing = GarageLinkRequest::where('user_id', $request->user()->id)->where('identifier', $identifier)->first();
+        if ($existing && in_array($existing->status, ['pending','approved'], true)) {
+            return $this->fail('A request for this vehicle already exists.', 409);
+        }
+        $linkRequest = GarageLinkRequest::updateOrCreate(
+            ['user_id'=>$request->user()->id,'identifier'=>$identifier],
+            ['car_name'=>$validated['car_name'] ?? null,'status'=>'pending','admin_notes'=>null,'reviewed_by'=>null,'reviewed_at'=>null],
+        );
+        return $this->ok($linkRequest->toApi(), 'Vehicle link request submitted.', status: 201);
+    }
+
+    public function cancelGarageLinkRequest(Request $request, GarageLinkRequest $garageLinkRequest): JsonResponse
+    {
+        abort_unless($garageLinkRequest->user_id === $request->user()->id, 404);
+        if ($garageLinkRequest->status !== 'pending') {
+            return $this->fail('Only pending requests can be cancelled.', 409);
+        }
+        $garageLinkRequest->delete();
+        return $this->ok(null, 'Vehicle link request cancelled.');
     }
 
     public function favorites(Request $request): JsonResponse
     {
         return $this->ok(
-            $request->user()->favorites()->with('vehicle')->get()->map(fn ($trim) => [
+            $request->user()->favorites()->where('trims.active', true)->whereHas('vehicle', fn ($query) => $query->where('active', true))->with('vehicle')->get()->map(fn ($trim) => [
                 'trim_id' => $trim->id,
                 'name' => $trim->vehicle->model,
                 'name_ar' => $trim->vehicle->model_ar,
-                'price_egp' => $trim->price_egp,
+                'price_egp' => $trim->executive_price,
                 'image_url' => $trim->vehicle->resolved_image_url,
             ]),
         );
@@ -72,10 +159,15 @@ class ProfileController extends ApiController
         );
     }
 
+    public function redemptions(Request $request): JsonResponse
+    {
+        return $this->ok(['items' => $request->user()->redemptions()->with('reward')->latest()->get()->map->toApi()->values()]);
+    }
+
     public function pointsHistory(Request $request): JsonResponse
     {
         $user = $request->user();
-        
+
         return $this->ok([
             'points_balance' => $user->points,
             'transactions' => $user->pointTransactions()->latest()->get()->map(fn ($t) => [
@@ -84,7 +176,7 @@ class ProfileController extends ApiController
                 'type' => $t->type,
                 'description' => $t->description,
                 'date' => $t->created_at->toIso8601String(),
-            ])
+            ]),
         ]);
     }
 
@@ -99,9 +191,12 @@ class ProfileController extends ApiController
 
         $result = DB::transaction(function () use ($request, $reward) {
             $user = User::whereKey($request->user()->id)->lockForUpdate()->first();
-            if (! $user || $user->points < $reward->points_cost) {
+            $reward = Reward::whereKey($reward->id)->lockForUpdate()->first();
+            if (! $user || ! $reward || $user->points < $reward->points_cost) {
                 return null;
             }
+            if ($reward->stock !== null && $reward->stock < 1) return ['error' => 'out_of_stock'];
+            if ($reward->per_user_limit !== null && $user->redemptions()->where('reward_id', $reward->id)->count() >= $reward->per_user_limit) return ['error' => 'limit_reached'];
 
             $user->decrement('points', $reward->points_cost);
             $user->pointTransactions()->create([
@@ -112,14 +207,16 @@ class ProfileController extends ApiController
 
             do {
                 $code = 'RWD-'.now()->year.'-'.Str::upper(Str::random(6));
-            } while ($user->redemptions()->where('code', $code)->exists());
+            } while (\App\Models\Redemption::where('code', $code)->exists());
 
             $redemption = $user->redemptions()->create([
                 'reward_id' => $reward->id,
                 'code' => $code,
                 'points_spent' => $reward->points_cost,
-                'valid_until' => now()->addMonths(6)->toDateString(),
+                'valid_until' => now()->addDays($reward->validity_days)->toDateString(),
             ]);
+            if ($reward->stock !== null) $reward->decrement('stock');
+            UserNotification::create(['user_id'=>$user->id,'type'=>'reward','title'=>'Reward redeemed','title_ar'=>'تم استبدال المكافأة','body'=>"Your redemption code is {$code}.",'body_ar'=>"كود استبدال المكافأة هو {$code}."]);
 
             return [
                 'points_remaining' => $user->points,
@@ -137,6 +234,8 @@ class ProfileController extends ApiController
                 400,
             );
         }
+        if (($result['error'] ?? null) === 'out_of_stock') return $this->fail('This reward is out of stock.', 409);
+        if (($result['error'] ?? null) === 'limit_reached') return $this->fail('You reached the redemption limit for this reward.', 409);
 
         return $this->ok([
             'reward' => ['id' => $reward->id, 'name' => $reward->name],

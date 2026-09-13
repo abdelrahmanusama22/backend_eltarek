@@ -6,5 +6,5 @@ use Illuminate\Database\Eloquent\Model;
 
 class LoyaltyRule extends Model
 {
-    protected $guarded = [];
+    protected $fillable = ['name', 'action', 'points_awarded', 'is_active'];
 }

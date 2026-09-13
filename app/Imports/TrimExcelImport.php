@@ -13,11 +13,11 @@ class TrimExcelImport implements ToCollection, WithHeadingRow
     {
         foreach ($rows as $row) {
             $id = $row['id'] ?? null;
-            
+
             if ($id) {
                 $trim = Trim::firstOrNew(['id' => $id]);
             } else {
-                $trim = new Trim();
+                $trim = new Trim;
             }
 
             // Map standard text / numeric fields
@@ -95,8 +95,8 @@ class TrimExcelImport implements ToCollection, WithHeadingRow
                 if (isset($row['category'])) {
                     $vehicleUpdates['category'] = $row['category'];
                 }
-                
-                if (!empty($vehicleUpdates)) {
+
+                if (! empty($vehicleUpdates)) {
                     $trim->vehicle->update($vehicleUpdates);
                 }
             }
@@ -105,7 +105,10 @@ class TrimExcelImport implements ToCollection, WithHeadingRow
 
     private function parseBool($value): bool
     {
-        if (is_bool($value)) return $value;
-        return in_array(strtolower(trim((string)$value)), ['1', 'true', 'yes', 'on']);
+        if (is_bool($value)) {
+            return $value;
+        }
+
+        return in_array(strtolower(trim((string) $value)), ['1', 'true', 'yes', 'on']);
     }
 }

@@ -3,7 +3,6 @@
 namespace App\Filament\Resources\OtpLogs\Pages;
 
 use App\Filament\Resources\OtpLogs\OtpLogResource;
-use Filament\Actions\CreateAction;
 use Filament\Resources\Pages\ListRecords;
 
 class ListOtpLogs extends ListRecords

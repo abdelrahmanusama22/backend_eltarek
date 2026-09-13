@@ -22,7 +22,8 @@ class SlotService
             'days_ahead' => 7,
         ]);
         $daysAhead = (int) ($config['days_ahead'] ?? 7);
-
+        $minimumNotice = max(0, (int) ($config['min_notice_minutes'] ?? 60));
+        $earliestAllowed = Carbon::now()->addMinutes($minimumNotice);
 
         $blockedDates = AppSetting::get('blocked_dates', []);
         $blockedDatesArray = array_column($blockedDates, 'date');
@@ -30,13 +31,30 @@ class SlotService
         $slots = [];
         for ($offset = 0; $offset < $daysAhead; $offset++) {
             $day = Carbon::today()->addDays($offset);
-            
+
             if (in_array($day->toDateString(), $blockedDatesArray)) {
                 continue; // Skip holiday/blocked date
             }
 
             $key = strtolower($day->format('D')); // sun, mon, fri…
-            $times = $config[$key] ?? $config['default'] ?? [];
+            // An explicitly configured empty day is closed; default is only for legacy configs.
+            $times = array_key_exists($key, $config)
+                ? (array) $config[$key]
+                : (array) ($config['default'] ?? []);
+            $times = collect($times)
+                ->filter(function (mixed $time) use ($day, $earliestAllowed): bool {
+                    try {
+                        $slot = Carbon::createFromFormat(
+                            'Y-m-d g:i A',
+                            $day->toDateString().' '.strtoupper(trim((string) $time))
+                        );
+                        return $slot->greaterThanOrEqualTo($earliestAllowed);
+                    } catch (\Throwable) {
+                        return false;
+                    }
+                })
+                ->values()
+                ->all();
             if (empty($times)) {
                 continue;
             }

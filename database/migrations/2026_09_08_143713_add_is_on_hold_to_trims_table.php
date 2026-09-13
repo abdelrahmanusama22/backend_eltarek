@@ -11,9 +11,7 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::table('trims', function (Blueprint $table) {
-            $table->boolean('is_on_hold')->default(false);
-        });
+        // Column is created by 2026_08_28_150559_add_import_fields_to_trims_table.
     }
 
     /**
@@ -21,8 +19,6 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::table('trims', function (Blueprint $table) {
-            $table->dropColumn('is_on_hold');
-        });
+        // Compatibility no-op: do not remove a column owned by an earlier migration.
     }
 };

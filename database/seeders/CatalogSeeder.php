@@ -577,6 +577,7 @@ class CatalogSeeder extends Seeder
             'default' => ['10:00 AM', '11:30 AM', '1:00 PM', '2:30 PM', '4:30 PM', '7:00 PM'],
             'fri' => ['2:00 PM', '4:00 PM', '6:00 PM'],
             'days_ahead' => 7,
+            'min_notice_minutes' => 60,
         ]);
         AppSetting::put('vip_benefits', [
             'silver' => [

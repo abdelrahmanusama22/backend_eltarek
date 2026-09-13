@@ -2,14 +2,6 @@
 
 namespace App\Filament\Resources\Users\RelationManagers;
 
-use Filament\Actions\AssociateAction;
-use Filament\Actions\BulkActionGroup;
-use Filament\Actions\CreateAction;
-use Filament\Actions\DeleteAction;
-use Filament\Actions\DeleteBulkAction;
-use Filament\Actions\DissociateAction;
-use Filament\Actions\DissociateBulkAction;
-use Filament\Actions\EditAction;
 use Filament\Forms\Components\TextInput;
 use Filament\Resources\RelationManagers\RelationManager;
 use Filament\Schemas\Schema;
@@ -38,7 +30,7 @@ class PointTransactionsRelationManager extends RelationManager
                 TextColumn::make('points')
                     ->badge()
                     ->color(fn ($record) => $record->type === 'credit' ? 'success' : 'danger')
-                    ->formatStateUsing(fn ($state, $record) => ($record->type === 'credit' ? '+' : '-') . $state),
+                    ->formatStateUsing(fn ($state, $record) => ($record->type === 'credit' ? '+' : '-').$state),
                 TextColumn::make('type')
                     ->badge()
                     ->color(fn ($state) => $state === 'credit' ? 'success' : 'danger'),

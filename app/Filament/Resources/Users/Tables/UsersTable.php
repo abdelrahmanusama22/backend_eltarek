@@ -2,19 +2,23 @@
 
 namespace App\Filament\Resources\Users\Tables;
 
+use App\Filament\Exports\UserExporter;
+use Filament\Actions\Action;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteBulkAction;
 use Filament\Actions\EditAction;
+use Filament\Actions\ExportAction;
+use Filament\Actions\ExportBulkAction;
+use Filament\Forms\Components\Select;
+use Filament\Forms\Components\TextInput;
+use Filament\Notifications\Notification;
 use Filament\Tables\Columns\IconColumn;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Columns\ToggleColumn;
-use Filament\Tables\Table;
-use Filament\Actions\Action;
-use Filament\Forms\Components\TextInput;
+use Filament\Tables\Columns\ImageColumn;
 use Filament\Tables\Filters\TernaryFilter;
-use Filament\Actions\ExportAction;
-use Filament\Actions\ExportBulkAction;
-use App\Filament\Exports\UserExporter;
+use Filament\Tables\Table;
+
 class UsersTable
 {
     public static function configure(Table $table): Table
@@ -22,11 +26,15 @@ class UsersTable
         return $table
             ->headerActions([
                 ExportAction::make()
-                    ->exporter(UserExporter::class)
+                    ->exporter(UserExporter::class),
             ])
             ->columns([
+                ImageColumn::make('avatar_url')->label('Photo')->circular()->disk('public'),
                 TextColumn::make('name')
                     ->searchable(),
+                TextColumn::make('email')
+                    ->searchable()
+                    ->copyable(),
                 TextColumn::make('phone')
                     ->searchable(),
                 TextColumn::make('points')
@@ -45,28 +53,28 @@ class UsersTable
             ])
             ->filters([
                 TernaryFilter::make('is_admin')
-                    ->label('المديرون')
+                    ->label('المديرون'),
             ])
             ->recordActions([
                 EditAction::make(),
-                Action::make("adjust_points")
+                Action::make('adjust_points')
                     ->label('Manage Points')
                     ->action(function ($record, array $data) {
                         $record->addPoints(
-                            (int) $data['points'], 
-                            $data['description'], 
+                            (int) $data['points'],
+                            $data['description'],
                             $data['type']
                         );
-                        \Filament\Notifications\Notification::make()
+                        Notification::make()
                             ->title($data['type'] === 'debit' ? 'Points deducted successfully' : 'Points added successfully')
                             ->success()
                             ->send();
                     })
                     ->form([
-                        \Filament\Forms\Components\Select::make('type')
+                        Select::make('type')
                             ->options([
                                 'credit' => 'Add Points (+)',
-                                'debit' => 'Deduct Points (-)'
+                                'debit' => 'Deduct Points (-)',
                             ])
                             ->required()
                             ->default('credit'),
@@ -78,9 +86,9 @@ class UsersTable
                             ->label('Reason')
                             ->required(),
                     ])
-                    ->icon("heroicon-o-star")
-                    ->color("warning"),
-                
+                    ->icon('heroicon-o-star')
+                    ->color('warning'),
+
             ])
             ->bulkActions([
                 BulkActionGroup::make([

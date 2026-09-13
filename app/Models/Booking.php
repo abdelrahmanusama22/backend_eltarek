@@ -7,9 +7,13 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class Booking extends Model
 {
-    protected $guarded = [];
+    protected $fillable = [
+        'user_id', 'trim_id', 'branch_id', 'date', 'day_label', 'day_label_ar',
+        'time', 'status', 'reference', 'slot_key', 'points_awarded_at',
+        'cancellation_reason', 'admin_notes',
+    ];
 
-    protected $casts = ['date' => 'date'];
+    protected $casts = ['date' => 'date', 'points_awarded_at' => 'datetime'];
 
     public function user(): BelongsTo
     {

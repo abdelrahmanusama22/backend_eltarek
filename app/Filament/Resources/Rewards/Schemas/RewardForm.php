@@ -23,7 +23,10 @@ class RewardForm
                 TextInput::make('points_cost')
                     ->required()
                     ->numeric()
-                    ->prefix('$'),
+                    ->suffix('points'),
+                TextInput::make('stock')->numeric()->minValue(0)->helperText('Leave empty for unlimited stock.'),
+                TextInput::make('per_user_limit')->numeric()->minValue(1)->helperText('Leave empty for no per-customer limit.'),
+                TextInput::make('validity_days')->required()->numeric()->minValue(1)->default(180)->suffix('days'),
                 Toggle::make('active')
                     ->required(),
             ]);

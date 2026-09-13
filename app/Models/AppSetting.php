@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\Cache;
 
 class AppSetting extends Model
 {
@@ -14,7 +15,7 @@ class AppSetting extends Model
 
     public $incrementing = false;
 
-    protected $guarded = [];
+    protected $fillable = ['key', 'value'];
 
     protected $casts = ['value' => 'array'];
 
@@ -26,5 +27,6 @@ class AppSetting extends Model
     public static function put(string $key, mixed $value): void
     {
         static::updateOrCreate(['key' => $key], ['value' => $value]);
+        Cache::forget('api:v1:home:payload');
     }
 }

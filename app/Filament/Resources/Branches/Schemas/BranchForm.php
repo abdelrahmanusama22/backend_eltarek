@@ -2,14 +2,15 @@
 
 namespace App\Filament\Resources\Branches\Schemas;
 
-use Filament\Forms\Components\TextInput;
-use Filament\Forms\Components\Textarea;
-use Filament\Forms\Components\Toggle;
-use Filament\Forms\Components\Hidden;
-use Filament\Schemas\Components\Section;
-use Filament\Forms\Components\Select;
-use Filament\Forms\Components\FileUpload;
 use Dotswan\MapPicker\Fields\Map;
+use Filament\Forms\Components\FileUpload;
+use Filament\Forms\Components\Hidden;
+use Filament\Forms\Components\Repeater;
+use Filament\Forms\Components\Select;
+use Filament\Forms\Components\TextInput;
+use Filament\Forms\Components\TimePicker;
+use Filament\Forms\Components\Toggle;
+use Filament\Schemas\Components\Section;
 use Filament\Schemas\Schema;
 
 class BranchForm
@@ -23,7 +24,11 @@ class BranchForm
                         FileUpload::make('image')
                             ->label('صورة أو شعار الفرع')
                             ->image()
+                            ->disk('public')
+                            ->visibility('public')
                             ->directory('branches')
+                            ->maxSize(5120)
+                            ->acceptedFileTypes(['image/jpeg', 'image/png', 'image/webp'])
                             ->columnSpanFull(),
                     ]),
                 Section::make('المعلومات العامة')
@@ -45,19 +50,49 @@ class BranchForm
                             ->hint('اتركه فارغاً إذا كان هو نفس رقم الهاتف'),
                         TextInput::make('address')->label('العنوان (English)')->required()->columnSpanFull(),
                         TextInput::make('address_ar')->label('العنوان (Arabic)')->required()->columnSpanFull(),
-                        TextInput::make('hours')->label('مواعيد العمل (English)')->required(),
-                        TextInput::make('hours_ar')->label('مواعيد العمل (Arabic)')->required(),
+                        Hidden::make('hours')->default(''),
+                        Hidden::make('hours_ar')->default(''),
+                        Repeater::make('opening_hours')
+                            ->label('جدول العمل الأسبوعي')
+                            ->helperText('هذا الجدول يحسب حالة مفتوح/مغلق في التطبيق تلقائياً حسب توقيت القاهرة.')
+                            ->schema([
+                                Select::make('day')->label('اليوم')->options([
+                                    'sat' => 'السبت', 'sun' => 'الأحد', 'mon' => 'الاثنين', 'tue' => 'الثلاثاء',
+                                    'wed' => 'الأربعاء', 'thu' => 'الخميس', 'fri' => 'الجمعة',
+                                ])->required()->disableOptionsWhenSelectedInSiblingRepeaterItems(),
+                                TimePicker::make('open')->label('يفتح')->seconds(false),
+                                TimePicker::make('close')->label('يغلق')->seconds(false),
+                                Toggle::make('closed')->label('مغلق طوال اليوم')->default(false),
+                            ])
+                            ->default([
+                                ['day' => 'sat', 'open' => '09:00', 'close' => '22:00', 'closed' => false],
+                                ['day' => 'sun', 'open' => '09:00', 'close' => '22:00', 'closed' => false],
+                                ['day' => 'mon', 'open' => '09:00', 'close' => '22:00', 'closed' => false],
+                                ['day' => 'tue', 'open' => '09:00', 'close' => '22:00', 'closed' => false],
+                                ['day' => 'wed', 'open' => '09:00', 'close' => '22:00', 'closed' => false],
+                                ['day' => 'thu', 'open' => '09:00', 'close' => '22:00', 'closed' => false],
+                                ['day' => 'fri', 'open' => '09:00', 'close' => '22:00', 'closed' => true],
+                            ])
+                            ->required()->minItems(7)->maxItems(7)
+                            ->columns(4)->reorderable(false)->addable(false)->deletable(false)->columnSpanFull(),
+                        Hidden::make('timezone')->default('Africa/Cairo'),
                         Select::make('services')
                             ->multiple()
+                            ->searchable()
+                            ->preload()
                             ->options([
-                                'sales' => 'مبيعات',
-                                'maintenance' => 'صيانة',
-                                'spare_parts' => 'قطع غيار',
-                                'customer_service' => 'خدمة عملاء',
+                                'Showroom' => 'معرض (Showroom)',
+                                'Test Drive' => 'تجربة قيادة (Test Drive)',
+                                'Finance Center' => 'خدمات التمويل (Finance Center)',
+                                'Service & Maintenance' => 'صيانة وخدمة (Service & Maintenance)',
+                                'sales' => 'مبيعات (Sales)',
+                                'maintenance' => 'صيانة (Maintenance)',
+                                'spare_parts' => 'قطع غيار (Spare Parts)',
+                                'customer_service' => 'خدمة عملاء (Customer Service)',
                             ])
                             ->label('الخدمات المقدمة')
                             ->columnSpanFull(),
-                        Toggle::make('is_open')->label('مفتوح الآن')->required(),
+                        Hidden::make('is_open')->default(false),
                         Toggle::make('active')->label('مفعل')->required(),
                     ])->columns(2),
 
@@ -68,13 +103,12 @@ class BranchForm
                             ->label('الموقع (قم بسحب الدبوس لتحديد المكان)')
                             ->columnSpanFull()
                             ->defaultLocation(30.0444, 31.2357)
-                            ->afterStateUpdated(function (\Filament\Forms\Get $get, \Filament\Forms\Set $set, ?array $state): void {
+                            ->afterStateUpdated(function ($set, ?array $state = null): void {
                                 if (is_array($state) && isset($state['lat'], $state['lng'])) {
                                     $set('lat', (float) $state['lat']);
                                     $set('lng', (float) $state['lng']);
                                 }
                             })
-                            ->liveLocation(true, true, 5000)
                             ->showMarker()
                             ->markerColor('#E01B22')
                             ->showFullscreenControl()
@@ -85,6 +119,7 @@ class BranchForm
                                 if ($record && $record->lat && $record->lng) {
                                     return ['lat' => (float) $record->lat, 'lng' => (float) $record->lng];
                                 }
+
                                 return ['lat' => 30.0444, 'lng' => 31.2357];
                             }),
                         Hidden::make('lat')->default(30.0444),

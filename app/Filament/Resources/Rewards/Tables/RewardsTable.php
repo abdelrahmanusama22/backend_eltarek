@@ -24,8 +24,11 @@ class RewardsTable
                 TextColumn::make('description_ar')
                     ->searchable(),
                 TextColumn::make('points_cost')
-                    ->money()
+                    ->suffix(' pts')
                     ->sortable(),
+                TextColumn::make('stock')->placeholder('Unlimited'),
+                TextColumn::make('per_user_limit')->label('Limit/customer')->placeholder('Unlimited'),
+                TextColumn::make('validity_days')->suffix(' days'),
                 IconColumn::make('active')
                     ->boolean(),
             ])

@@ -17,7 +17,7 @@ class VehicleController extends ApiController
             'sort' => ['nullable', 'in:price_asc,price_desc,newest'],
         ]);
 
-        $query = Vehicle::with(['brand', 'trims'])->where('active', true)->whereBetween('year', [now()->year - 1, now()->year + 1]);
+        $query = Vehicle::with(['brand', 'trims'])->where('active', true);
 
         if ($brandId = $request->integer('brand_id')) {
             $query->where('brand_id', $brandId);
@@ -63,7 +63,6 @@ class VehicleController extends ApiController
 
         $vehicles = Vehicle::with(['brand', 'trims'])
             ->where('active', true)
-            ->whereBetween('year', [now()->year - 1, now()->year + 1])
             ->where(function ($query) use ($escapedQ) {
                 $query->where('model', 'like', "%{$escapedQ}%")
                     ->orWhere('model_ar', 'like', "%{$escapedQ}%")
@@ -84,6 +83,8 @@ class VehicleController extends ApiController
     /** GET /vehicles/{vehicle}/trims */
     public function trims(Vehicle $vehicle): JsonResponse
     {
+        abort_unless($vehicle->active, 404);
+
         return $this->ok([
             'vehicle_id' => $vehicle->id,
             'model' => $vehicle->model,
@@ -98,6 +99,8 @@ class VehicleController extends ApiController
     /** GET /trims/{trim} */
     public function trimDetail(Request $request, Trim $trim): JsonResponse
     {
+        abort_unless($trim->active && $trim->vehicle?->active, 404);
+
         $user = $request->user('sanctum');
         $vehicle = $trim->vehicle;
         $rival = $trim->suggested_comparison_trim_id
@@ -125,6 +128,8 @@ class VehicleController extends ApiController
     /** POST /trims/{trim}/favorite */
     public function toggleFavorite(Request $request, Trim $trim): JsonResponse
     {
+        abort_unless($trim->active && $trim->vehicle?->active, 404);
+
         $user = $request->user();
         $isFavorited = $user->favorites()->whereKey($trim->id)->exists();
         $user->favorites()->toggle($trim->id);
@@ -138,18 +143,19 @@ class VehicleController extends ApiController
     /** GET /vehicles/{vehicle} */
     public function show($id): JsonResponse
     {
-        $vehicle = Vehicle::with(['brand', 'trims'])->findOrFail($id);
+        $vehicle = Vehicle::with(['brand', 'trims'])->where('active', true)->findOrFail($id);
+
         return $this->ok($this->vehicleListItem($vehicle));
     }
 
     private function vehicleListItem(Vehicle $vehicle): array
     {
-        return array_merge($vehicle->toApi(), [
+        return array_merge($vehicle->toApi(includeTrims: false), [
             'brand' => $vehicle->brand?->toApi() ?? ['id' => $vehicle->brand_id, 'name' => ''],
             'trims_count' => $vehicle->trims->count(),
             'primary_trim_id' => $vehicle->trims->first()?->id,
             'availability' => 'available',
-            'trims' => $vehicle->trims->map(fn($trim) => [
+            'trims' => $vehicle->trims->map(fn ($trim) => [
                 'id' => $trim->id,
                 'name' => $trim->name,
                 'price_egp' => $trim->price_egp,

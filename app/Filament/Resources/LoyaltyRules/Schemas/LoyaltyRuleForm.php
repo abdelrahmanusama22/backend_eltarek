@@ -2,10 +2,10 @@
 
 namespace App\Filament\Resources\LoyaltyRules\Schemas;
 
-use Filament\Schemas\Schema;
-use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Select;
+use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
+use Filament\Schemas\Schema;
 
 class LoyaltyRuleForm
 {
@@ -29,7 +29,7 @@ class LoyaltyRuleForm
                     ->numeric()
                     ->required()
                     ->default(100),
-                \Filament\Forms\Components\Toggle::make('is_active')
+                Toggle::make('is_active')
                     ->label('Active')
                     ->default(true),
             ]);

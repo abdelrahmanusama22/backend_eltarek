@@ -13,7 +13,7 @@ php artisan serve --port=8010
 ```
 
 Port **8010** is what the app expects in dev (8000 is occupied by Laragon on
-this machine). The Flutter app hydrates its catalog from `GET /api/v1/bootstrap`
+this machine). The Flutter app hydrates its catalog from granular endpoints (`GET /api/v1/catalog/...` and `GET /api/v1/app-config`)
 on launch and silently falls back to its bundled data when the server is down.
 
 ## OTP / SMS Misr
@@ -57,7 +57,7 @@ mobile repo (`ElTarek_Automotive_API.postman_collection.json`) documents every
 endpoint. Highlights:
 
 - `POST auth/send-otp | verify-otp | resend-otp`, `POST auth/complete-profile`, `POST auth/logout`
-- `GET bootstrap` — full catalog in one call (app hydration)
+- `GET catalog/vehicles`, `GET catalog/trims`, `GET catalog/brands`, `GET app-config` — granular cached catalog hydration
 - `GET home`, `GET vehicles`, `GET vehicles/search`, `GET vehicles/{id}/trims`, `GET trims/{id}`
 - `POST finance/calculate`, `POST finance/eligibility`
 - `GET/POST compare`, `DELETE compare/{trimId}` (max 3)

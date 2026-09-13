@@ -2,9 +2,10 @@
 
 namespace App\Models;
 
+use App\Support\CatalogEvents;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Branch extends Model
 {
@@ -12,31 +13,76 @@ class Branch extends Model
 
     public $timestamps = false;
 
-    protected $guarded = [];
+    protected $fillable = [
+        'city_id', 'image', 'name', 'name_ar', 'address', 'address_ar', 'phone',
+        'whatsapp', 'hours', 'hours_ar', 'opening_hours', 'timezone', 'is_open', 'lat', 'lng', 'services', 'active',
+    ];
 
     protected $casts = [
         'services' => 'array',
+        'opening_hours' => 'array',
         'is_open' => 'boolean',
         'active' => 'boolean',
         'lat' => 'float',
         'lng' => 'float',
     ];
 
+    protected static function booted(): void
+    {
+        static::saving(function (Branch $branch): void {
+            if (! $branch->hours) {
+                $branch->hours = $branch->scheduleSummary();
+            }
+            if (! $branch->hours_ar) {
+                $branch->hours_ar = $branch->hours;
+            }
+        });
+        static::saved(fn () => CatalogEvents::broadcast('Branches updated'));
+        static::deleted(fn () => CatalogEvents::broadcast('Branches updated'));
+        static::restored(fn () => CatalogEvents::broadcast('Branches updated'));
+    }
+
+    public function getResolvedImageUrlAttribute(): ?string
+    {
+        $path = $this->image;
+        if (! $path) {
+            return null;
+        }
+        if (str_starts_with($path, 'http://') || str_starts_with($path, 'https://')) {
+            return $path;
+        }
+        $clean = ltrim((string) $path, '/');
+        if (str_starts_with($clean, 'storage/')) {
+            $clean = substr($clean, 8);
+        }
+        if (str_starts_with($clean, 'media/')) {
+            $clean = substr($clean, 6);
+        }
+        if (str_starts_with($clean, 'assets/')) {
+            return '/'.$clean;
+        }
+
+        return '/media/'.$clean;
+    }
+
     public function toApi(?float $lat = null, ?float $lng = null): array
     {
+        $todayHours = $this->todayHours();
         $data = [
             'id' => $this->id,
             'city_id' => $this->city_id,
-            'image' => $this->image ? asset('storage/' . $this->image) : null,
+            'image' => $this->resolved_image_url,
+            'image_url' => $this->resolved_image_url,
             'name' => $this->name,
             'name_ar' => $this->name_ar,
             'address' => $this->address,
             'address_ar' => $this->address_ar,
             'phone' => $this->phone,
             'whatsapp' => $this->whatsapp ?: $this->phone,
-            'hours' => $this->hours,
-            'hours_ar' => $this->hours_ar,
-            'is_open' => $this->is_open,
+            'hours' => $todayHours ?? $this->hours,
+            'hours_ar' => $todayHours ?? $this->hours_ar,
+            'today_hours' => $todayHours,
+            'is_open' => $this->isOpenNow(),
             'lat' => $this->lat,
             'lng' => $this->lng,
             'services' => $this->services ?? [],
@@ -46,6 +92,86 @@ class Branch extends Model
         }
 
         return $data;
+    }
+
+    public function isOpenNow(): bool
+    {
+        if (empty($this->opening_hours)) {
+            return (bool) $this->is_open;
+        }
+        $now = now($this->timezone ?: 'Africa/Cairo');
+        if ($this->isBlockedDate($now->toDateString())) {
+            return false;
+        }
+
+        foreach ([$now, $now->copy()->subDay()] as $slotDate) {
+            $day = strtolower($slotDate->format('D'));
+            foreach ($this->opening_hours as $slot) {
+                if (($slot['day'] ?? null) !== $day || ($slot['closed'] ?? false)) {
+                    continue;
+                }
+                $open = $slotDate->copy()->setTimeFromTimeString($slot['open'] ?? '00:00');
+                $close = $slotDate->copy()->setTimeFromTimeString($slot['close'] ?? '00:00');
+                if ($close->lessThanOrEqualTo($open)) {
+                    $close->addDay();
+                }
+                if ($now->betweenIncluded($open, $close)) {
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    }
+
+    public function todayHours(): ?string
+    {
+        if (empty($this->opening_hours)) {
+            return null;
+        }
+        $now = now($this->timezone ?: 'Africa/Cairo');
+        if ($this->isBlockedDate($now->toDateString())) {
+            return 'Closed';
+        }
+        $day = strtolower($now->format('D'));
+        foreach ($this->opening_hours as $slot) {
+            if (($slot['day'] ?? null) !== $day) {
+                continue;
+            }
+            if ($slot['closed'] ?? false) {
+                return 'Closed';
+            }
+            $open = $slot['open'] ?? null;
+            $close = $slot['close'] ?? null;
+            if (! $open || ! $close) {
+                return 'Closed';
+            }
+
+            return now()->setTimeFromTimeString($open)->format('g:i A').' - '.now()->setTimeFromTimeString($close)->format('g:i A');
+        }
+
+        return 'Closed';
+    }
+
+    private function scheduleSummary(): string
+    {
+        foreach ($this->opening_hours ?? [] as $slot) {
+            if (($slot['closed'] ?? false) || empty($slot['open']) || empty($slot['close'])) {
+                continue;
+            }
+
+            return now()->setTimeFromTimeString($slot['open'])->format('g:i A').' - '
+                .now()->setTimeFromTimeString($slot['close'])->format('g:i A');
+        }
+
+        return 'Closed';
+    }
+
+    private function isBlockedDate(string $date): bool
+    {
+        return collect(AppSetting::get('blocked_dates', []))->contains(
+            fn ($item) => is_array($item) && ($item['date'] ?? null) === $date
+        );
     }
 
     /** Haversine distance in km. */

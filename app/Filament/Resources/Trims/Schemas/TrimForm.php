@@ -3,10 +3,13 @@
 namespace App\Filament\Resources\Trims\Schemas;
 
 use Filament\Forms\Components\FileUpload;
+use Filament\Forms\Components\Placeholder;
 use Filament\Forms\Components\Repeater;
 use Filament\Forms\Components\Select;
+use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
+use Filament\Schemas\Components\Group;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Components\Tabs;
 use Filament\Schemas\Components\Tabs\Tab;
@@ -47,9 +50,9 @@ class TrimForm
                             ->default(5)
                             ->suffix('%')
                             ->helperText('Executive Price will be calculated automatically based on this %'),
-                        \Filament\Forms\Components\Placeholder::make('executive_price_display')
+                        Placeholder::make('executive_price_display')
                             ->label('Executive Price (Calculated)')
-                            ->content(fn ($record) => $record ? number_format($record->executive_price) . ' EGP' : '-'),
+                            ->content(fn ($record) => $record ? number_format($record->executive_price).' EGP' : '-'),
                         TextInput::make('total_price')
                             ->label('Total Price (إجمالى السعر)')
                             ->numeric()
@@ -70,7 +73,7 @@ class TrimForm
                             ->label('Available Colors (الألوان المتاحة)')
                             ->maxLength(255)
                             ->default(null),
-                        \Filament\Forms\Components\Textarea::make('financing_notes')
+                        Textarea::make('financing_notes')
                             ->label('Financing Notes (معلومات اضافية)')
                             ->rows(2)
                             ->default(null),
@@ -109,23 +112,31 @@ class TrimForm
                     ->columns(2),
 
                 Section::make('Gallery (صور الفئة)')
+                    ->description('Upload vehicle photos for the mobile app gallery slider.')
                     ->schema([
                         FileUpload::make('gallery')
-                            ->label('Trim Images (الصور)')
+                            ->label('Trim Gallery Images (صور المعرض)')
                             ->multiple()
                             ->image()
                             ->disk('public')
                             ->directory('vehicles/gallery')
+                            ->maxSize(5120)
+                            ->maxFiles(20)
                             ->reorderable()
+                            ->appendFiles()
                             ->columnSpanFull(),
                     ]),
 
                 Section::make('Highlights (أهم المواصفات السريعة)')
+                    ->description('Promotional highlights shown as chips in mobile car card (e.g. Engine, Transmission, Safety).')
                     ->schema([
                         Repeater::make('highlights')
+                            ->label('Key Highlights (أبرز المميزات)')
+                            ->addActionLabel('Add Highlight (إضافة ميزة)')
+                            ->defaultItems(0)
                             ->schema([
                                 Select::make('icon')
-                                    ->label('Icon')
+                                    ->label('Icon (الأيقونة)')
                                     ->options([
                                         'engine' => 'Engine (محرك)',
                                         'transmission' => 'Transmission (ناقل حركة)',
@@ -137,13 +148,18 @@ class TrimForm
                                     ->default('engine')
                                     ->required(),
                                 TextInput::make('label')
-                                    ->label('Label (EN)')
+                                    ->label('Label EN (الوصف انجليزي)')
+                                    ->placeholder('e.g. 1600 CC TURBO')
                                     ->required(),
                                 TextInput::make('label_ar')
-                                    ->label('Label (AR)')
+                                    ->label('Label AR (الوصف عربي)')
+                                    ->placeholder('مثال: ١٦٠٠ سي سي تيربو')
                                     ->required(),
                             ])
                             ->columns(3)
+                            ->reorderable()
+                            ->cloneable()
+                            ->collapsible()
                             ->columnSpanFull(),
                     ]),
 
@@ -153,7 +169,7 @@ class TrimForm
                             ->tabs([
                                 Tab::make('Tech (تكنولوجيا)')
                                     ->schema([
-                                        \Filament\Schemas\Components\Group::make()
+                                        Group::make()
                                             ->schema([
                                                 TextInput::make('specs.tech.engine')->label('Engine')->default(null),
                                                 TextInput::make('specs.tech.hp')->label('Horsepower')->default(null),
@@ -161,6 +177,7 @@ class TrimForm
                                             ])->columns(3),
                                         Repeater::make('specs.tech.custom_tech')
                                             ->label('Custom Tech Specs')
+                                            ->defaultItems(0)
                                             ->schema([
                                                 TextInput::make('label')->required(),
                                                 TextInput::make('label_ar')->required(),
@@ -170,13 +187,14 @@ class TrimForm
                                     ]),
                                 Tab::make('Safety (أمان)')
                                     ->schema([
-                                        \Filament\Schemas\Components\Group::make()
+                                        Group::make()
                                             ->schema([
                                                 TextInput::make('specs.safety.airbags')->label('Airbags')->default(null),
                                                 TextInput::make('specs.safety.abs_ebd')->label('ABS & EBD')->default(null),
                                             ])->columns(2),
                                         Repeater::make('specs.safety.custom_safety')
                                             ->label('Custom Safety Specs')
+                                            ->defaultItems(0)
                                             ->schema([
                                                 TextInput::make('label')->required(),
                                                 TextInput::make('label_ar')->required(),
@@ -186,13 +204,14 @@ class TrimForm
                                     ]),
                                 Tab::make('Interior (مقصورة)')
                                     ->schema([
-                                        \Filament\Schemas\Components\Group::make()
+                                        Group::make()
                                             ->schema([
                                                 TextInput::make('specs.interior.seats_material')->label('Seats Material')->default(null),
                                                 TextInput::make('specs.interior.screen_size')->label('Screen Size')->default(null),
                                             ])->columns(2),
                                         Repeater::make('specs.interior.custom_interior')
                                             ->label('Custom Interior Specs')
+                                            ->defaultItems(0)
                                             ->schema([
                                                 TextInput::make('label')->required(),
                                                 TextInput::make('label_ar')->required(),
@@ -202,13 +221,14 @@ class TrimForm
                                     ]),
                                 Tab::make('Exterior (خارجي)')
                                     ->schema([
-                                        \Filament\Schemas\Components\Group::make()
+                                        Group::make()
                                             ->schema([
                                                 TextInput::make('specs.exterior.wheels_size')->label('Wheels Size')->default(null),
                                                 TextInput::make('specs.exterior.sunroof')->label('Sunroof')->default(null),
                                             ])->columns(2),
                                         Repeater::make('specs.exterior.custom_exterior')
                                             ->label('Custom Exterior Specs')
+                                            ->defaultItems(0)
                                             ->schema([
                                                 TextInput::make('label')->required(),
                                                 TextInput::make('label_ar')->required(),
@@ -238,6 +258,26 @@ class TrimForm
                                     ->schema([
                                         TextInput::make('metrics.speed.display')->label('Display (e.g. 200 km/h)'),
                                         TextInput::make('metrics.speed.score')->label('Score 1-100')->numeric(),
+                                    ])->columns(2),
+                                Tab::make('Engine')
+                                    ->schema([
+                                        TextInput::make('metrics.engine.display')->label('Display (e.g. 2.0L Turbo)'),
+                                        TextInput::make('metrics.engine.score')->label('Comparison score')->numeric(),
+                                    ])->columns(2),
+                                Tab::make('Fuel Economy')
+                                    ->schema([
+                                        TextInput::make('metrics.fuel.display')->label('Display (e.g. 6.5 L/100km)'),
+                                        TextInput::make('metrics.fuel.score')->label('Comparison score (higher is better)')->numeric(),
+                                    ])->columns(2),
+                                Tab::make('Airbags')
+                                    ->schema([
+                                        TextInput::make('metrics.airbags.display')->label('Display'),
+                                        TextInput::make('metrics.airbags.score')->label('Comparison score')->numeric(),
+                                    ])->columns(2),
+                                Tab::make('Sunroof')
+                                    ->schema([
+                                        TextInput::make('metrics.sunroof.display')->label('Display'),
+                                        TextInput::make('metrics.sunroof.score')->label('Comparison score')->numeric(),
                                     ])->columns(2),
                             ])
                             ->columnSpanFull(),

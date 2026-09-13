@@ -3,8 +3,9 @@
 namespace App\Filament\Resources\Bookings\Pages;
 
 use App\Filament\Resources\Bookings\BookingResource;
-use Filament\Resources\Pages\Page;
 use App\Models\Booking;
+use Filament\Resources\Pages\Page;
+use Illuminate\Contracts\Support\Htmlable;
 
 class ListBookings extends Page
 {
@@ -33,8 +34,8 @@ class ListBookings extends Page
     {
         $this->activeTab = $tab;
     }
-    
-    public function getTitle(): string | \Illuminate\Contracts\Support\Htmlable
+
+    public function getTitle(): string|Htmlable
     {
         return '';
     }

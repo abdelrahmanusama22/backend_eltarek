@@ -55,4 +55,9 @@ return [
         'max_attempts' => (int) env('OTP_MAX_ATTEMPTS', 5),
     ],
 
+    'google' => [
+        'web_client_id' => env('GOOGLE_WEB_CLIENT_ID'),
+        'android_client_id' => env('GOOGLE_ANDROID_CLIENT_ID'),
+    ],
+
 ];

@@ -6,7 +6,7 @@ use Illuminate\Database\Eloquent\Model;
 
 class PointTransaction extends Model
 {
-    protected $guarded = [];
+    protected $fillable = ['user_id', 'points', 'description', 'type'];
 
     public function user()
     {

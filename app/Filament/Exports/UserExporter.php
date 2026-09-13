@@ -38,10 +38,10 @@ class UserExporter extends Exporter
 
     public static function getCompletedNotificationBody(Export $export): string
     {
-        $body = 'Your user export has completed and ' . Str::of('row')->counted($export->successful_rows) . ' exported.';
+        $body = 'Your user export has completed and '.Str::of('row')->counted($export->successful_rows).' exported.';
 
         if ($failedRowsCount = $export->getFailedRowsCount()) {
-            $body .= ' ' . Str::of('row')->counted($failedRowsCount) . ' failed to export.';
+            $body .= ' '.Str::of('row')->counted($failedRowsCount).' failed to export.';
         }
 
         return $body;

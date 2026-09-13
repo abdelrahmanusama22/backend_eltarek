@@ -25,16 +25,17 @@ class FinanceController extends ApiController
         ]);
 
         $trim = Trim::findOrFail($validated['trim_id']);
+        $vehiclePrice = $trim->executive_price;
         $rate = (float) ($config['interest_rate_percent'] ?? 0);
 
-        $downPayment = (int) round($trim->price_egp * $validated['down_payment_percent'] / 100);
-        $loan = $trim->price_egp - $downPayment;
+        $downPayment = (int) round($vehiclePrice * $validated['down_payment_percent'] / 100);
+        $loan = $vehiclePrice - $downPayment;
         $years = $validated['duration_months'] / 12;
         $totalWithInterest = $loan * (1 + $rate / 100 * $years);
         $monthly = (int) ceil($totalWithInterest / $validated['duration_months']);
 
         return $this->ok([
-            'vehicle_price_egp' => $trim->price_egp,
+            'vehicle_price_egp' => $vehiclePrice,
             'down_payment_egp' => $downPayment,
             'down_payment_percent' => $validated['down_payment_percent'],
             'loan_amount_egp' => $loan,
@@ -66,7 +67,7 @@ class FinanceController extends ApiController
         $maxPrice = (int) floor($maxLoan / (1 - $defaultDp / 100));
 
         $trim = isset($validated['trim_id']) ? Trim::find($validated['trim_id']) : null;
-        $eligible = $trim === null || $trim->price_egp <= $maxPrice;
+        $eligible = $trim === null || $trim->executive_price <= $maxPrice;
 
         if (! $eligible) {
             return $this->ok([
@@ -78,7 +79,7 @@ class FinanceController extends ApiController
         }
 
         $estimated = $trim
-            ? (int) ceil($trim->price_egp * (1 - $defaultDp / 100) / ($config['default_duration_months'] ?? 60))
+            ? (int) ceil($trim->executive_price * (1 - $defaultDp / 100) / ($config['default_duration_months'] ?? 60))
             : null;
 
         return $this->ok([
