@@ -14,7 +14,9 @@ jobs:
           php-version: '8.4'
           extensions: mbstring, sqlite, pdo_sqlite
           coverage: none
+      - run: php -v
       - run: composer install --no-interaction --prefer-dist
+      - run: composer check-platform-reqs
       - run: composer validate --strict
       - run: composer audit --locked
       - run: cp .env.example .env

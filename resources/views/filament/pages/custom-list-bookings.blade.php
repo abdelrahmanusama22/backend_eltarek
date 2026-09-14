@@ -135,7 +135,7 @@
             <div class="flex items-center gap-3 w-full sm:w-auto">
                 <div class="relative w-full sm:w-64">
                     <span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-text-secondary text-sm">search</span>
-                    <input class="w-full bg-surface-container-high border border-border-subtle rounded text-sm pl-9 pr-3 py-1.5 text-on-surface focus:border-primary focus:ring-1 focus:ring-primary/20 outline-none transition-all placeholder:text-text-secondary" placeholder="Search bookings..." type="text"/>
+                    <input wire:model.live.debounce.300ms="search" class="w-full bg-surface-container-high border border-border-subtle rounded text-sm pl-9 pr-3 py-1.5 text-on-surface focus:border-primary focus:ring-1 focus:ring-primary/20 outline-none transition-all placeholder:text-text-secondary" placeholder="Search bookings..." type="search"/>
                 </div>
             </div>
             
@@ -146,14 +146,6 @@
                 <button wire:click="setTab('completed')" class="px-3 py-1 rounded text-sm font-medium transition-colors {{ $activeTab === 'completed' ? 'bg-[#25252B] text-white shadow-sm' : 'text-text-secondary hover:text-on-surface' }}">Completed</button>
             </div>
 
-            <div class="flex items-center gap-2 w-full sm:w-auto justify-end hidden md:flex">
-                <button class="bg-transparent border border-border-subtle text-text-secondary hover:text-on-surface hover:bg-surface-container-high px-3 py-1.5 rounded text-sm font-medium transition-colors flex items-center gap-1.5">
-                    <span class="material-symbols-outlined text-sm">filter_list</span> Filter
-                </button>
-                <button class="bg-transparent border border-border-subtle text-text-secondary hover:text-on-surface hover:bg-surface-container-high px-3 py-1.5 rounded text-sm font-medium transition-colors flex items-center gap-1.5">
-                    <span class="material-symbols-outlined text-sm">download</span> Export
-                </button>
-            </div>
         </div>
 
         <!-- Table -->
@@ -171,7 +163,10 @@
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-border-subtle bg-surface-container-low">
-                    @forelse($this->bookings as $booking)
+                    @php
+                        $bookings = $this->bookings;
+                    @endphp
+                    @forelse($bookings as $booking)
                     <tr class="hover:bg-surface-container-high/50 transition-colors group">
                         <td class="py-3 px-4 font-label-mono text-text-secondary text-[11px]">#BK-{{ 9000 + $booking->id }}</td>
                         <td class="py-3 px-4">
@@ -220,17 +215,7 @@
                         </td>
                         <td class="py-3 px-4 text-right">
                             <div class="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                @if($booking->status === 'pending')
-                                    <button wire:click="$set('activeTab', 'pending')" class="p-1 text-success-green hover:bg-success-green/10 rounded transition-colors" title="Confirm">
-                                        <span class="material-symbols-outlined text-[18px]">check_circle</span>
-                                    </button>
-                                @endif
-                                @if(in_array($booking->status, ['pending', 'confirmed']))
-                                    <button class="p-1 text-error hover:bg-error/10 rounded transition-colors" title="Cancel">
-                                        <span class="material-symbols-outlined text-[18px]">cancel</span>
-                                    </button>
-                                @endif
-                                <a href="/admin/bookings/{{ $booking->id }}/edit" class="p-1 text-text-secondary hover:text-on-surface rounded hover:bg-surface-container transition-colors" title="Edit">
+                                <a href="/admin/bookings/{{ $booking->id }}/edit" class="p-1 text-text-secondary hover:text-on-surface rounded hover:bg-surface-container transition-colors" title="Update status">
                                     <span class="material-symbols-outlined text-[18px]">edit</span>
                                 </a>
                             </div>
@@ -248,20 +233,11 @@
             </table>
         </div>
 
-        <!-- Pagination (Static Mockup for design match) -->
+        <!-- Livewire pagination -->
         <div class="p-4 border-t border-border-subtle flex items-center justify-between text-sm">
-            <span class="text-text-secondary">Showing <span class="text-on-surface font-medium">1</span> to <span class="text-on-surface font-medium">{{ count($this->bookings) }}</span> of <span class="text-on-surface font-medium">{{ count($this->bookings) }}</span> bookings</span>
-            <div class="flex items-center gap-1">
-                <button class="px-2 py-1 text-text-secondary hover:text-on-surface disabled:opacity-50 disabled:cursor-not-allowed" disabled="">
-                    <span class="material-symbols-outlined text-sm">chevron_left</span>
-                </button>
-                <button class="w-7 h-7 rounded flex items-center justify-center bg-surface-container-high text-on-surface border border-border-subtle font-medium">1</button>
-                <button class="px-2 py-1 text-text-secondary hover:text-on-surface disabled:opacity-50 disabled:cursor-not-allowed" disabled="">
-                    <span class="material-symbols-outlined text-sm">chevron_right</span>
-                </button>
-            </div>
+            <span class="text-text-secondary">Showing {{ $bookings->firstItem() ?? 0 }} to {{ $bookings->lastItem() ?? 0 }} of {{ $bookings->total() }} bookings</span>
+            {{ $bookings->links(data: ['scrollTo' => false]) }}
         </div>
     </div>
 </div>
 </x-filament-panels::page>
-

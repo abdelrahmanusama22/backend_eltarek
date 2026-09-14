@@ -20,7 +20,7 @@ class TestDriveController extends ApiController
     public function fleet(): JsonResponse
     {
         $fleet = Trim::with('vehicle')
-            ->where('active', true)
+            ->published()
             ->where('in_test_drive_fleet', true)
             ->orderBy('fleet_sort')
             ->get();
@@ -51,7 +51,7 @@ class TestDriveController extends ApiController
             default => null,
         };
 
-        return $this->ok($query->get()->map->toApi());
+        return $this->ok($this->cursorItems($request, $query->orderByDesc('id'), fn ($booking) => $booking->toApi()));
     }
 
     /** POST /test-drives */
@@ -66,6 +66,10 @@ class TestDriveController extends ApiController
             'day_label' => ['nullable', 'string', 'max:40'],
             'time' => ['required', 'string', 'max:20'],
         ]);
+
+        if (! Trim::published()->whereKey($validated['trim_id'])->where('in_test_drive_fleet', true)->exists()) {
+            return $this->fail('The selected trim is not available for test drives.', 422);
+        }
 
         $user = $request->user();
 

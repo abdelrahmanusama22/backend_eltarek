@@ -82,7 +82,7 @@ class AnalyticsPage extends Page
 
         // Branch distribution
         $branchBookings = Booking::where('created_at', '>=', $startDate)
-            ->with('branch')
+            ->with('branch.city')
             ->select('branch_id', DB::raw('count(*) as total'))
             ->groupBy('branch_id')
             ->orderByDesc('total')

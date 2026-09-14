@@ -75,6 +75,7 @@ class GarageCar extends Model
             'service_history' => $this->relationLoaded('serviceRecords')
                 ? $this->serviceRecords->map->toApi()->values()->all()
                 : [],
+            'service_history_total' => $this->service_records_count ?? 0,
         ];
     }
 }
