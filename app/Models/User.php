@@ -27,8 +27,10 @@ class User extends Authenticatable implements FilamentUser
     protected $fillable = [
         'name',
         'email',
+        'pending_email',
         'email_verified_at',
         'google_id',
+        'apple_id',
         'phone',
         'password',
         'age',
@@ -183,6 +185,7 @@ class User extends Authenticatable implements FilamentUser
             'id' => $this->id,
             'full_name' => $this->name,
             'email' => $this->email,
+            'pending_email' => $this->pending_email,
             'phone' => $this->phone,
             'avatar_url' => is_string($this->avatar_url) && str_starts_with($this->avatar_url, 'avatars/')
                 ? '/storage/'.$this->avatar_url

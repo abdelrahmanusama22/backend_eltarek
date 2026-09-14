@@ -17,7 +17,7 @@ class VehicleController extends ApiController
             'sort' => ['nullable', 'in:price_asc,price_desc,newest'],
         ]);
 
-        $query = Vehicle::with(['brand', 'trims'])->where('active', true);
+        $query = Vehicle::with(['brand', 'trims'])->published();
 
         if ($brandId = $request->integer('brand_id')) {
             $query->where('brand_id', $brandId);
@@ -62,7 +62,7 @@ class VehicleController extends ApiController
         $terms = $this->vehicleSearchTerms($q);
 
         $vehicles = Vehicle::with(['brand', 'trims'])
-            ->where('active', true)
+            ->published()
             ->where(function ($query) use ($terms) {
                 foreach ($terms as $term) {
                     $escaped = str_replace(['\\', '%', '_'], ['\\\\', '\\%', '\\_'], $term);
@@ -125,7 +125,7 @@ class VehicleController extends ApiController
     /** GET /vehicles/{vehicle}/trims */
     public function trims(Vehicle $vehicle): JsonResponse
     {
-        abort_unless($vehicle->active, 404);
+        abort_unless(Vehicle::published()->whereKey($vehicle->id)->exists(), 404);
 
         return $this->ok([
             'vehicle_id' => $vehicle->id,
@@ -141,12 +141,12 @@ class VehicleController extends ApiController
     /** GET /trims/{trim} */
     public function trimDetail(Request $request, Trim $trim): JsonResponse
     {
-        abort_unless($trim->active && $trim->vehicle?->active, 404);
+        abort_unless(Trim::published()->whereKey($trim->id)->exists(), 404);
 
         $user = $request->user('sanctum');
         $vehicle = $trim->vehicle;
         $rival = $trim->suggested_comparison_trim_id
-            ? Trim::with('vehicle')->find($trim->suggested_comparison_trim_id)
+            ? Trim::with('vehicle')->published()->find($trim->suggested_comparison_trim_id)
             : null;
 
         // "BMW X5 M50i" + trim "M50i" => keep "BMW X5 M50i", not "BMW X5 M50i M50i".
@@ -170,7 +170,7 @@ class VehicleController extends ApiController
     /** POST /trims/{trim}/favorite */
     public function toggleFavorite(Request $request, Trim $trim): JsonResponse
     {
-        abort_unless($trim->active && $trim->vehicle?->active, 404);
+        abort_unless(Trim::published()->whereKey($trim->id)->exists(), 404);
 
         $user = $request->user();
         $isFavorited = $user->favorites()->whereKey($trim->id)->exists();
@@ -185,7 +185,7 @@ class VehicleController extends ApiController
     /** GET /vehicles/{vehicle} */
     public function show($id): JsonResponse
     {
-        $vehicle = Vehicle::with(['brand', 'trims'])->where('active', true)->findOrFail($id);
+        $vehicle = Vehicle::with(['brand', 'trims'])->published()->findOrFail($id);
 
         return $this->ok($this->vehicleListItem($vehicle));
     }
