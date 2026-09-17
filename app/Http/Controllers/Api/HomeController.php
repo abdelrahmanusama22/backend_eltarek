@@ -24,16 +24,13 @@ class HomeController extends ApiController
 
     public function index(Request $request): JsonResponse
     {
-        $version = CatalogEvents::version();
-        $cacheKey = self::CACHE_KEY.':'.$version;
-        $payload = Cache::remember($cacheKey, now()->addSeconds(self::CACHE_TTL_SECONDS), function () use ($version) {
-            $configuredHeroIds = AppSetting::get('home_hero_vehicle_ids');
-            $heroIds = Vehicle::published()
-                ->whereIn('id', $configuredHeroIds ?? [])
+        $payload = Cache::remember(self::cacheKey(), now()->addSeconds(self::CACHE_TTL_SECONDS), function () {
+            $heroIds = Vehicle::where('active', true)
+                ->whereIn('id', AppSetting::get('home_hero_vehicle_ids', []))
                 ->pluck('id')->values();
             $heroQuery = Vehicle::with('trims')
-                ->published()
-                ->when($configuredHeroIds !== null, fn ($query) => $query->whereIn('id', $heroIds), fn ($query) => $query->whereNotNull('badge')->orderBy('sort'));
+                ->where('active', true)
+                ->when($heroIds->isNotEmpty(), fn ($query) => $query->whereIn('id', $heroIds), fn ($query) => $query->whereNotNull('badge')->orderBy('sort'));
             $heroes = $heroQuery->take(5)->get()
                 ->when($heroIds->isNotEmpty(), fn ($items) => $items->sortBy(fn (Vehicle $vehicle) => $heroIds->search($vehicle->id)))
                 ->values()
@@ -41,24 +38,27 @@ class HomeController extends ApiController
                 ->values()
                 ->all();
 
-            $brands = Brand::published()
+            $brands = Brand::where('active', true)
                 ->orderBy('sort')
                 ->get()
                 ->map->toApi()
                 ->values()
                 ->all();
 
-            $configuredMatchRows = AppSetting::get('smart_matches');
-            $configuredMatches = collect($configuredMatchRows ?? [])
+            $configuredMatches = collect(AppSetting::get('smart_matches', []))
                 ->filter(fn ($item) => is_array($item) && ! empty($item['trim_id']))->values();
-            $smartIds = Trim::published()
+            $smartIds = Trim::where('active', true)
+                ->whereHas('vehicle', fn ($query) => $query->where('active', true))
                 ->whereIn('id', $configuredMatches->pluck('trim_id'))
                 ->pluck('id')->sortBy(fn ($id) => $configuredMatches->pluck('trim_id')->search($id))->values();
-            $smartMatches = Trim::published()
+            $smartMatches = Trim::whereHas('vehicle', function ($q) {
+                $q->where('active', true);
+            })
+                ->where('active', true)
                 ->with(['vehicle' => function ($query) {
                     $query->select('id', 'image_url', 'model', 'model_ar', 'engine_summary');
                 }])
-                ->when($configuredMatchRows !== null, fn ($query) => $query->whereIn('id', $smartIds), fn ($query) => $query->orderByDesc('is_most_popular')->orderBy('price_egp'))
+                ->when($smartIds->isNotEmpty(), fn ($query) => $query->whereIn('id', $smartIds), fn ($query) => $query->orderByDesc('is_most_popular')->orderBy('price_egp'))
                 ->take(8)
                 ->get()
                 ->when($smartIds->isNotEmpty(), fn ($items) => $items->sortBy(fn (Trim $trim) => $smartIds->search($trim->id)))
@@ -81,17 +81,20 @@ class HomeController extends ApiController
                 ->values()
                 ->all();
 
-            $configuredBudgetRows = AppSetting::get('budget_pick_trim_ids');
-            $configuredBudgetIds = collect($configuredBudgetRows ?? [])->map(fn ($id) => (int) $id)->filter()->values();
-            $budgetIds = Trim::published()
+            $configuredBudgetIds = collect(AppSetting::get('budget_pick_trim_ids', []))->map(fn ($id) => (int) $id)->filter()->values();
+            $budgetIds = Trim::where('active', true)
+                ->whereHas('vehicle', fn ($query) => $query->where('active', true))
                 ->whereIn('id', $configuredBudgetIds)
                 ->pluck('id')->sortBy(fn ($id) => $configuredBudgetIds->search($id))->values();
-            $budgetPicks = Trim::published()
+            $budgetPicks = Trim::whereHas('vehicle', function ($q) {
+                $q->where('active', true);
+            })
+                ->where('active', true)
                 ->with(['vehicle' => function ($query) {
                     $query->select('id', 'image_url', 'model', 'model_ar', 'monthly_from_egp');
                 }])
                 ->whereNotNull('price_egp')
-                ->when($configuredBudgetRows !== null, fn ($query) => $query->whereIn('id', $budgetIds), fn ($query) => $query->orderBy('price_egp', 'asc'))
+                ->when($budgetIds->isNotEmpty(), fn ($query) => $query->whereIn('id', $budgetIds), fn ($query) => $query->orderBy('price_egp', 'asc'))
                 ->take(8)
                 ->get()
                 ->when($budgetIds->isNotEmpty(), fn ($items) => $items->sortBy(fn (Trim $trim) => $budgetIds->search($trim->id)))
@@ -112,7 +115,7 @@ class HomeController extends ApiController
                 ->all();
 
             return [
-                'catalog_version' => $version,
+                'catalog_version' => CatalogEvents::version(),
                 'heroes' => $heroes,
                 'brands' => $brands,
                 'smart_matches' => $smartMatches,
@@ -121,16 +124,6 @@ class HomeController extends ApiController
             ];
         });
 
-        if (CatalogEvents::version() !== $version) {
-            Cache::forget($cacheKey);
-            $attempt = (int) $request->attributes->get('home_version_attempt', 0);
-            if ($attempt >= 2) {
-                return $this->fail('Home content changed during loading. Retry.', 503);
-            }
-            $request->attributes->set('home_version_attempt', $attempt + 1);
-            return $this->index($request);
-        }
-
-        return $this->ok($payload)->header('Cache-Control', 'no-store');
+        return $this->ok($payload)->header('Cache-Control', 'public, max-age=120');
     }
 }

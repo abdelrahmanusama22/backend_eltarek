@@ -4,24 +4,10 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use Illuminate\Http\JsonResponse;
-use Illuminate\Http\Request;
-use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Database\Eloquent\Relations\Relation;
 
 /** Shared JSON envelope with stable metadata and structured errors. */
 abstract class ApiController extends Controller
 {
-    protected function cursorItems(Request $request, Builder|Relation $query, callable $map): array
-    {
-        $limit = min(50, max(1, (int) $request->query('limit', 20)));
-        $page = $query->cursorPaginate($limit);
-
-        return [
-            'items' => $page->getCollection()->map($map)->values(),
-            'next_cursor' => $page->nextCursor()?->encode(),
-        ];
-    }
-
     protected function ok(mixed $data = null, ?string $message = null, ?array $meta = null, int $status = 200): JsonResponse
     {
         $payload = [

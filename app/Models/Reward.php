@@ -24,7 +24,7 @@ class Reward extends Model
             'points_cost' => $this->points_cost,
             'user_can_redeem' => $user !== null && $user->points >= $this->points_cost,
             'in_stock' => $this->stock === null || $this->stock > 0,
-            'remaining_for_user' => $user && $this->per_user_limit !== null ? max(0, $this->per_user_limit - ($this->user_redemptions_count ?? $this->redemptions()->where('user_id', $user->id)->count())) : null,
+            'remaining_for_user' => $user && $this->per_user_limit !== null ? max(0, $this->per_user_limit - $this->redemptions()->where('user_id', $user->id)->count()) : null,
         ];
     }
 }

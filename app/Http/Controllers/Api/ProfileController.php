@@ -38,21 +38,12 @@ class ProfileController extends ApiController
             }
         }
 
-        $requestedEmail = array_key_exists('email', $validated) && $validated['email'] !== null
-            ? mb_strtolower($validated['email']) : null;
-        if ($requestedEmail !== null && $requestedEmail !== mb_strtolower((string) $user->email)) {
-            $user->update(['pending_email' => $requestedEmail]);
-        }
-
         $user->update(array_filter([
             'name' => $validated['full_name'] ?? null,
+            'email' => $validated['email'] ?? null,
             'city_id' => $validated['city_id'] ?? null,
             'age' => $validated['age'] ?? null,
         ], fn ($v) => $v !== null));
-
-        if ($requestedEmail !== null && $requestedEmail !== mb_strtolower((string) $user->email)) {
-            app(AuthController::class)->sendPendingEmailVerification($requestedEmail);
-        }
 
         return $this->ok($user->fresh()->load('city')->toApi(), 'Profile updated successfully.');
     }
@@ -104,29 +95,12 @@ class ProfileController extends ApiController
 
     public function garage(Request $request): JsonResponse
     {
-        return $this->ok($this->cursorItems(
-            $request,
-            $request->user()->garageCars()->with('vehicle')->withCount('serviceRecords')
-                ->with(['serviceRecords' => fn ($query) => $query->orderByDesc('id')->limit(3)])
-                ->orderByDesc('id'),
-            fn ($car) => $car->toApi(),
-        ));
-    }
-
-    public function garageServiceRecords(Request $request, \App\Models\GarageCar $garageCar): JsonResponse
-    {
-        abort_unless($garageCar->user_id === $request->user()->id, 404);
-
-        return $this->ok($this->cursorItems(
-            $request,
-            $garageCar->serviceRecords()->reorder()->orderByDesc('id'),
-            fn ($record) => $record->toApi(),
-        ));
+        return $this->ok(['items' => $request->user()->garageCars()->with(['vehicle', 'serviceRecords'])->latest()->get()->map->toApi()->values()]);
     }
 
     public function garageLinkRequests(Request $request): JsonResponse
     {
-        return $this->ok($this->cursorItems($request, $request->user()->garageLinkRequests()->orderByDesc('id'), fn ($link) => $link->toApi()));
+        return $this->ok(['items' => $request->user()->garageLinkRequests()->latest()->get()->map->toApi()->values()]);
     }
 
     public function requestGarageLink(Request $request): JsonResponse
@@ -165,35 +139,29 @@ class ProfileController extends ApiController
 
     public function favorites(Request $request): JsonResponse
     {
-        return $this->ok($this->cursorItems(
-            $request,
-            $request->user()->favorites()->published()->with('vehicle')->orderBy('trims.id'),
-            fn ($trim) => [
+        return $this->ok(
+            $request->user()->favorites()->where('trims.active', true)->whereHas('vehicle', fn ($query) => $query->where('active', true))->with('vehicle')->get()->map(fn ($trim) => [
                 'trim_id' => $trim->id,
                 'name' => $trim->vehicle->model,
                 'name_ar' => $trim->vehicle->model_ar,
                 'price_egp' => $trim->executive_price,
                 'image_url' => $trim->vehicle->resolved_image_url,
-            ],
-        ));
+            ]),
+        );
     }
 
     public function rewards(Request $request): JsonResponse
     {
         $user = $request->user();
 
-        return $this->ok($this->cursorItems(
-            $request,
-            Reward::where('active', true)
-                ->withCount(['redemptions as user_redemptions_count' => fn ($query) => $query->where('user_id', $user->id)])
-                ->orderBy('id'),
-            fn (Reward $reward) => $reward->toApi($user),
-        ));
+        return $this->ok(
+            Reward::where('active', true)->get()->map(fn (Reward $r) => $r->toApi($user)),
+        );
     }
 
     public function redemptions(Request $request): JsonResponse
     {
-        return $this->ok($this->cursorItems($request, $request->user()->redemptions()->with('reward')->orderByDesc('id'), fn ($redemption) => $redemption->toApi()));
+        return $this->ok(['items' => $request->user()->redemptions()->with('reward')->latest()->get()->map->toApi()->values()]);
     }
 
     public function pointsHistory(Request $request): JsonResponse
@@ -202,7 +170,7 @@ class ProfileController extends ApiController
 
         return $this->ok([
             'points_balance' => $user->points,
-            ...$this->cursorItems($request, $user->pointTransactions()->orderByDesc('id'), fn ($t) => [
+            'transactions' => $user->pointTransactions()->latest()->get()->map(fn ($t) => [
                 'id' => $t->id,
                 'points' => $t->points,
                 'type' => $t->type,

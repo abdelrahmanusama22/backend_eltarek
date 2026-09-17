@@ -12,7 +12,7 @@ class BrandController extends ApiController
     {
         return $this->ok(
             Brand::withCount('vehicles')
-                ->published()
+                ->where('active', true)
                 ->orderBy('sort')
                 ->get()
                 ->map(fn (Brand $brand) => array_merge($brand->toApi(), [
@@ -23,34 +23,25 @@ class BrandController extends ApiController
 
     public function show(Request $request, Brand $brand): JsonResponse
     {
-        abort_unless($brand->active, 404);
-        $request->validate([
-            'category' => ['nullable', 'string', 'max:100'],
-            'limit' => ['nullable', 'integer', 'min:1', 'max:50'],
-        ]);
-        $limit = min(50, max(1, $request->integer('limit', 20)));
+        $allVehicles = $brand->vehicles()->with('trims')->get();
         $categories = array_values(array_unique(array_merge(
             ['All'],
-            $brand->vehicles()->distinct()->pluck('category')->filter()->values()->all(),
+            $allVehicles->pluck('category')->filter()->unique()->values()->all(),
         )));
 
-        $models = $brand->vehicles()->with('trims');
+        $models = $allVehicles;
         if ($category = $request->string('category')->toString()) {
             if ($category !== 'All') {
-                $models->where('category', $category);
+                $models = $models->where('category', $category)->values();
             }
         }
-        $page = $models->orderBy('id')->cursorPaginate($limit);
 
         return $this->ok(array_merge($brand->toApi(), [
             'categories' => $categories,
-            'models' => collect($page->items())->map(fn ($v) => array_merge($v->toApi(), [
+            'models' => $models->map(fn ($v) => array_merge($v->toApi(), [
                 'trims_count' => $v->trims->count(),
                 'primary_trim_id' => $v->trims->first()?->id,
             ])),
-        ]), meta: [
-            'next_cursor' => $page->nextCursor()?->encode(),
-            'has_more' => $page->hasMorePages(),
-        ]);
+        ]));
     }
 }

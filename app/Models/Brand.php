@@ -4,7 +4,6 @@ namespace App\Models;
 
 use App\Support\CatalogEvents;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
@@ -17,11 +16,6 @@ class Brand extends Model
     protected $fillable = ['name', 'name_ar', 'tagline', 'tagline_ar', 'monogram', 'tier', 'logo_url', 'sort', 'active'];
 
     protected $casts = ['active' => 'boolean'];
-
-    public function scopePublished(Builder $query): Builder
-    {
-        return $query->where('active', true);
-    }
 
     protected static function booted()
     {

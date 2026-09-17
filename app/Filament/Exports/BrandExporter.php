@@ -3,7 +3,6 @@
 namespace App\Filament\Exports;
 
 use App\Models\Brand;
-use Illuminate\Database\Eloquent\Builder;
 use Filament\Actions\Exports\ExportColumn;
 use Filament\Actions\Exports\Exporter;
 use Filament\Actions\Exports\Models\Export;
@@ -12,11 +11,6 @@ use Illuminate\Support\Str;
 class BrandExporter extends Exporter
 {
     protected static ?string $model = Brand::class;
-
-    public static function modifyQuery(Builder $query): Builder
-    {
-        return $query->withCount('vehicles');
-    }
 
     public static function getColumns(): array
     {
@@ -43,7 +37,7 @@ class BrandExporter extends Exporter
                 ->label('Active'),
             ExportColumn::make('vehicles_count')
                 ->label('Vehicles Count')
-                ->state(fn (Brand $record) => $record->vehicles_count),
+                ->state(fn (Brand $record) => $record->vehicles()->count()),
         ];
     }
 

@@ -3,7 +3,6 @@
 namespace App\Filament\Widgets;
 
 use App\Models\Booking;
-use App\Models\GarageLinkRequest;
 use App\Models\User;
 use App\Models\Vehicle;
 use Carbon\Carbon;
@@ -18,8 +17,8 @@ class StatsOverview extends StatsOverviewWidget
     {
         $todayBookings = Booking::whereDate('created_at', Carbon::today())->count();
         $totalCustomers = User::where('is_admin', false)->count();
-        $activeVehicles = Vehicle::where('active', true)->count();
-        $pendingGarageLinks = GarageLinkRequest::where('status', 'pending')->count();
+        $activeVehicles = Vehicle::count();
+        $pendingRequests = Booking::where('status', 'pending')->count();
 
         return [
             Stat::make("Today's Bookings", $todayBookings)
@@ -31,11 +30,11 @@ class StatsOverview extends StatsOverviewWidget
                 ->color('success'),
 
             Stat::make('Active Vehicles', $activeVehicles)
-                ->description('Published catalog vehicles')
+                ->description('Catalog records')
                 ->color('gray'),
 
-            Stat::make('Pending Garage Link Requests', $pendingGarageLinks)
-                ->description('Awaiting admin approval')
+            Stat::make('Pending Requests', $pendingRequests)
+                ->description('Requires attention')
                 ->descriptionIcon('heroicon-m-exclamation-circle')
                 ->color('danger'),
         ];

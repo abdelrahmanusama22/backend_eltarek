@@ -5,7 +5,6 @@ namespace App\Models;
 use App\Domain\Pricing\PricingService;
 use App\Support\CatalogEvents;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Facades\DB;
@@ -37,12 +36,6 @@ class Trim extends Model
         'is_on_hold' => 'boolean',
         'markup_percentage' => 'float',
     ];
-
-    public function scopePublished(Builder $query): Builder
-    {
-        return $query->where('active', true)->where('price_egp', '>', 0)
-            ->whereHas('vehicle', fn (Builder $vehicle) => $vehicle->published());
-    }
 
     protected static function booted()
     {

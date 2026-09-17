@@ -28,12 +28,7 @@ Route::prefix('v1')->group(function () {
         Route::post('email/forgot-password', [AuthController::class, 'forgotPassword'])->middleware('throttle:5,1');
         Route::post('email/reset-password', [AuthController::class, 'resetPassword'])->middleware(['throttle:10,1', 'idempotency']);
         Route::post('google', [AuthController::class, 'google'])->middleware(['throttle:10,1', 'idempotency']);
-        Route::post('apple', [AuthController::class, 'apple'])->middleware(['throttle:10,1', 'idempotency']);
-        Route::post('apple/challenge', [AuthController::class, 'appleChallenge'])->middleware('throttle:10,1');
-        Route::post('apple/callback', [AuthController::class, 'appleCallback'])->middleware('throttle:30,1');
         Route::middleware('auth:sanctum')->group(function () {
-            Route::post('google/link', [AuthController::class, 'linkGoogle'])->middleware('throttle:10,1');
-            Route::post('apple/link', [AuthController::class, 'linkApple'])->middleware('throttle:10,1');
             Route::post('complete-profile', [AuthController::class, 'completeProfile'])->middleware('throttle:10,1');
             Route::post('email/verify', [AuthController::class, 'verifyEmail'])->middleware('throttle:10,1');
             Route::post('email/resend-verification', [AuthController::class, 'resendVerificationEmail'])->middleware('throttle:5,1');
@@ -87,7 +82,6 @@ Route::prefix('v1')->group(function () {
         Route::put('profile', [ProfileController::class, 'update']);
         Route::post('profile/avatar', [ProfileController::class, 'uploadAvatar'])->middleware('throttle:10,1');
         Route::get('profile/garage', [ProfileController::class, 'garage']);
-        Route::get('profile/garage/{garageCar}/service-records', [ProfileController::class, 'garageServiceRecords']);
         Route::get('profile/garage-link-requests', [ProfileController::class, 'garageLinkRequests']);
         Route::post('profile/garage-link-requests', [ProfileController::class, 'requestGarageLink'])->middleware(['throttle:5,1', 'idempotency']);
         Route::delete('profile/garage-link-requests/{garageLinkRequest}', [ProfileController::class, 'cancelGarageLinkRequest']);

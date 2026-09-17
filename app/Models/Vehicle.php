@@ -4,7 +4,6 @@ namespace App\Models;
 
 use App\Support\CatalogEvents;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
@@ -22,12 +21,6 @@ class Vehicle extends Model
     ];
 
     protected $casts = ['active' => 'boolean'];
-
-    public function scopePublished(Builder $query): Builder
-    {
-        return $query->where('active', true)
-            ->whereHas('brand', fn (Builder $brand) => $brand->published());
-    }
 
     protected static function booted()
     {
