@@ -68,10 +68,7 @@ class HomeController extends ApiController
 
                     return [
                         'match_percentage' => (int) ($configured['match_percentage'] ?? 0),
-                        'trim' => [
-                            'id' => $trim->id,
-                            'price_egp' => $trim->executive_price,
-                        ],
+                        'trim' => $trim->toApi(),
                         'vehicle' => $trim->vehicle ? [
                             'id' => $trim->vehicle->id,
                             'image_url' => $trim->vehicle->resolved_image_url,
@@ -101,10 +98,7 @@ class HomeController extends ApiController
                 ->values()
                 ->map(function ($trim) {
                     return [
-                        'trim' => [
-                            'id' => $trim->id,
-                            'price_egp' => $trim->executive_price,
-                        ],
+                        'trim' => $trim->toApi(),
                         'vehicle' => $trim->vehicle ? [
                             'id' => $trim->vehicle->id,
                             'image_url' => $trim->vehicle->resolved_image_url,

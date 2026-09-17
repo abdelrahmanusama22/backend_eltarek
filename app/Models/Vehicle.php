@@ -32,9 +32,15 @@ class Vehicle extends Model
     protected static function booted()
     {
         static::saved(function () {
+            \Illuminate\Support\Facades\Cache::flush();
             CatalogEvents::broadcast();
         });
         static::deleted(function () {
+            \Illuminate\Support\Facades\Cache::flush();
+            CatalogEvents::broadcast();
+        });
+        static::restored(function () {
+            \Illuminate\Support\Facades\Cache::flush();
             CatalogEvents::broadcast();
         });
     }
@@ -100,14 +106,14 @@ class Vehicle extends Model
 
     public function getStartingPrice(): int
     {
-        if ($this->relationLoaded('trims') && $this->trims->count() > 0) {
-            return (int) $this->trims->min('executive_price');
+        if ($this->starting_price_egp > 0) {
+            return (int) $this->starting_price_egp;
         }
 
-        $min = $this->trims()
-            ->get()
-            ->min('executive_price');
+        if ($this->relationLoaded('trims') && $this->trims->count() > 0) {
+            return (int) $this->trims->min('price_egp');
+        }
 
-        return (int) ($min ?? $this->starting_price_egp);
+        return (int) $this->trims()->min('price_egp');
     }
 }
