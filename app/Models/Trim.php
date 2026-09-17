@@ -59,14 +59,17 @@ class Trim extends Model
 
         static::saved(function (Trim $trim) use ($updateVehiclePrice) {
             $updateVehiclePrice($trim);
+            \Illuminate\Support\Facades\Cache::flush();
             CatalogEvents::broadcast();
         });
         static::deleted(function (Trim $trim) use ($updateVehiclePrice) {
             $updateVehiclePrice($trim);
+            \Illuminate\Support\Facades\Cache::flush();
             CatalogEvents::broadcast();
         });
         static::restored(function (Trim $trim) use ($updateVehiclePrice) {
             $updateVehiclePrice($trim);
+            \Illuminate\Support\Facades\Cache::flush();
             CatalogEvents::broadcast();
         });
     }

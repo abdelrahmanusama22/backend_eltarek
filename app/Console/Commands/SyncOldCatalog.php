@@ -23,7 +23,8 @@ class SyncOldCatalog extends Command
         $this->info('Starting catalog sync...');
 
         try {
-            $response = Http::timeout(30)->get('http://192.168.202.62:8087/api/export-catalog');
+            $url = env('CATALOG_SYNC_URL', 'https://test.dfskegypt.com/api/export-catalog');
+            $response = Http::timeout(30)->acceptJson()->get($url);
 
             if (! $response->successful()) {
                 $this->error('Failed to fetch data. HTTP Status: '.$response->status());
@@ -41,6 +42,39 @@ class SyncOldCatalog extends Command
 
             $this->withProgressBar($data, function ($item) {
                 DB::transaction(function () use ($item) {
+                    $year = $item['year'] ?? null;
+                    if ($year && in_array((string)$year, ['2020', '2021', '2022', '2023', '2024'])) {
+                        return; // Skip vehicles from 2020-2024
+                    }
+                    $modelName = ($item['model'] ?? '') . ' ' . ($item['model_ar'] ?? '');
+                    if (preg_match('/2020|2021|2022|2023|2024/', $modelName)) {
+                        return; // Skip if year is mentioned in model name
+                    }
+
+                    $trims = $item['trims'] ?? [];
+                    if (is_array($trims)) {
+                        $trims = array_filter($trims, function ($trimData) {
+                            $price = $trimData['price_egp'] ?? null;
+                            if (empty($price) || floatval($price) < 200000) {
+                                return false;
+                            }
+                            $trimName = $trimData['name'] ?? '';
+                            if (preg_match('/2020|2021|2022|2023|2024/', $trimName)) {
+                                return false;
+                            }
+                            return true;
+                        });
+                    }
+
+                    if (empty($trims)) {
+                        return; // Skip vehicle if no valid trims remain
+                    }
+
+                    $minPrice = collect($trims)->min('price_egp') ?? 0;
+                    if ($minPrice < 200000) {
+                        return;
+                    }
+
                     // Sync Brand
                     $brandData = $item['brand'] ?? [];
                     $brandId = $brandData['id'] ?? $item['brand_id'] ?? null;
@@ -50,22 +84,18 @@ class SyncOldCatalog extends Command
                         return; // Cannot sync without brand id
                     }
 
-                    $brand = Brand::updateOrCreate(
-                        ['id' => $brandId],
+                    $brand = Brand::withTrashed()->updateOrCreate(
+                        ['name' => $brandName],
                         [
-                            'name' => $brandName,
                             'name_ar' => $brandData['name_ar'] ?? $brandName,
                         ]
                     );
-
-                    $trims = $item['trims'] ?? [];
-                    $minPrice = 0;
-                    if (is_array($trims) && count($trims) > 0) {
-                        $minPrice = collect($trims)->min('price_egp') ?? 0;
+                    if ($brand->trashed()) {
+                        $brand->restore();
                     }
 
                     // Sync Vehicle
-                    $vehicle = Vehicle::updateOrCreate(
+                    $vehicle = Vehicle::withTrashed()->updateOrCreate(
                         [
                             'brand_id' => $brand->id,
                             'model' => $item['model'] ?? null,
@@ -77,34 +107,54 @@ class SyncOldCatalog extends Command
                             'starting_price_egp' => $minPrice,
                         ]
                     );
+                    if ($vehicle->trashed()) {
+                        $vehicle->restore();
+                    }
 
                     // Sync Trims
-                    if (is_array($trims)) {
-                        foreach ($trims as $trimData) {
-                            Trim::withoutEvents(function () use ($vehicle, $trimData) {
-                                Trim::updateOrCreate(
-                                    [
-                                        'vehicle_id' => $vehicle->id,
-                                        'name' => $trimData['name'] ?? null,
-                                    ],
-                                    [
-                                        'name_ar' => $trimData['name_ar'] ?? $trimData['name'] ?? 'Unknown',
-                                        'price_egp' => $trimData['price_egp'] ?? 0,
-                                        'active' => $trimData['active'] ?? true,
-                                        'highlights' => $trimData['highlights'] ?? [],
-                                        'specs' => $trimData['specs'] ?? [],
-                                        'metrics' => $trimData['metrics'] ?? [],
-                                        'gallery' => $trimData['gallery'] ?? [],
-                                    ]
-                                );
+                    foreach ($trims as $trimData) {
+                        if (isset($trimData['price_egp']) && floatval($trimData['price_egp']) < 200000) {
+                            continue;
+                        }
+
+                        Trim::withoutEvents(function () use ($vehicle, $trimData) {
+                                $trim = Trim::withTrashed()
+                                    ->where('vehicle_id', $vehicle->id)
+                                    ->where('name', $trimData['name'] ?? null)
+                                    ->first();
+
+                                $attributes = [
+                                    'name_ar' => $trimData['name_ar'] ?? $trimData['name'] ?? 'Unknown',
+                                    'price_egp' => $trimData['price_egp'] ?? 0,
+                                    'highlights' => $trimData['highlights'] ?? [],
+                                    'specs' => $trimData['specs'] ?? [],
+                                    'metrics' => $trimData['metrics'] ?? [],
+                                    'gallery' => $trimData['gallery'] ?? [],
+                                ];
+
+                                if (!$trim) {
+                                    $attributes['vehicle_id'] = $vehicle->id;
+                                    $attributes['name'] = $trimData['name'] ?? null;
+                                    $attributes['active'] = $trimData['active'] ?? true;
+                                    $trim = Trim::create($attributes);
+                                } else {
+                                    $trim->update($attributes);
+                                }
+
+                                if ($trim->trashed()) {
+                                    $trim->restore();
+                                }
                             });
                         }
-                    }
                 });
             });
 
+
             $this->newLine();
             $this->info('Catalog sync completed successfully.');
+
+            \Illuminate\Support\Facades\Cache::flush();
+            \App\Support\CatalogEvents::broadcast();
 
             return self::SUCCESS;
         } catch (\Exception $e) {
@@ -114,3 +164,4 @@ class SyncOldCatalog extends Command
         }
     }
 }
+

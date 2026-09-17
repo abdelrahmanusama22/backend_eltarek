@@ -155,12 +155,7 @@ class VehicleController extends ApiController
             'trims_count' => $vehicle->trims->count(),
             'primary_trim_id' => $vehicle->trims->first()?->id,
             'availability' => 'available',
-            'trims' => $vehicle->trims->map(fn ($trim) => [
-                'id' => $trim->id,
-                'name' => $trim->name,
-                'price_egp' => $trim->price_egp,
-                'active' => $trim->active,
-            ])->toArray(),
+            'trims' => $vehicle->trims->map->toApi()->toArray(),
         ]);
     }
 }
