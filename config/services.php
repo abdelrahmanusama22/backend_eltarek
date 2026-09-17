@@ -60,4 +60,10 @@ return [
         'android_client_id' => env('GOOGLE_ANDROID_CLIENT_ID'),
     ],
 
+    'apple' => [
+        'bundle_id' => env('APPLE_BUNDLE_ID'),
+        'service_id' => env('APPLE_SERVICE_ID'),
+        'android_package' => env('APPLE_ANDROID_PACKAGE', 'com.eltarek.eltarek_mobile'),
+    ],
+
 ];

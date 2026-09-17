@@ -2,10 +2,11 @@
 
 namespace App\Http\Controllers\Api;
 
-use Google\Client as GoogleClient;
 use App\Models\OtpCode;
 use App\Models\User;
 use App\Services\SmsMisrService;
+use App\Services\AppleIdentityTokenVerifier;
+use App\Services\GoogleIdentityTokenVerifier;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
@@ -235,13 +236,19 @@ class AuthController extends ApiController
             }
         }
 
+        $newEmail = ! empty($validated['email']) ? mb_strtolower($validated['email']) : null;
+        $emailChanged = $newEmail !== null && $newEmail !== mb_strtolower((string) $user->email);
         $user->update([
             'name' => $validated['full_name'],
             'age' => $validated['age'],
             'city_id' => $validated['city_id'],
-            'email' => $validated['email'] ?? $user->email,
+            'pending_email' => $emailChanged ? $newEmail : $user->pending_email,
             'profile_complete' => true,
         ]);
+
+        if ($emailChanged) {
+            $this->sendVerificationCode($newEmail);
+        }
 
         return $this->ok($user->fresh()->load('city')->toApi(), 'Profile completed successfully.');
     }
@@ -254,19 +261,26 @@ class AuthController extends ApiController
         $request->validate(['code' => ['required', 'digits:6']]);
 
         $user = $request->user();
-        if ($user->email_verified_at) {
+        $targetEmail = $user->pending_email ?: $user->email;
+        if (! $user->pending_email && $user->email_verified_at) {
             return $this->ok($user->toApi(), 'Email already verified.');
         }
+        if (! $targetEmail) {
+            return $this->fail('No email address on file.', 422);
+        }
 
-        $cacheKey = 'email_verify:'.hash('sha256', $user->email);
+        $cacheKey = 'email_verify:'.hash('sha256', $targetEmail);
         $stored = Cache::get($cacheKey);
 
         if (! $stored || ! Hash::check($request->string('code')->toString(), $stored)) {
             return $this->fail('Invalid or expired verification code.', 400);
         }
 
+        if ($user->pending_email && User::where('email', $targetEmail)->whereKeyNot($user->id)->exists()) {
+            return $this->fail('This email is already associated with another account.', 409);
+        }
         Cache::forget($cacheKey);
-        $user->update(['email_verified_at' => now()]);
+        $user->update(['email' => $targetEmail, 'pending_email' => null, 'email_verified_at' => now()]);
 
         return $this->ok($user->fresh()->load('city')->toApi(), 'Email verified successfully.');
     }
@@ -275,14 +289,15 @@ class AuthController extends ApiController
     public function resendVerificationEmail(Request $request): JsonResponse
     {
         $user = $request->user();
-        if ($user->email_verified_at) {
+        if (! $user->pending_email && $user->email_verified_at) {
             return $this->fail('Email is already verified.', 422);
         }
-        if (! $user->email) {
+        $targetEmail = $user->pending_email ?: $user->email;
+        if (! $targetEmail) {
             return $this->fail('No email address on file.', 422);
         }
 
-        $this->sendVerificationCode($user->email);
+        $this->sendVerificationCode($targetEmail);
 
         return $this->ok(null, 'Verification code resent.');
     }
@@ -349,6 +364,11 @@ class AuthController extends ApiController
 
     // -------------------------------------------------- helpers
 
+    public function sendPendingEmailVerification(string $email): void
+    {
+        $this->sendVerificationCode($email);
+    }
+
     private function sendVerificationCode(string $email): string
     {
         $ttl      = 15 * 60; // 15 minutes
@@ -379,7 +399,7 @@ class AuthController extends ApiController
         }
     }
 
-    public function google(Request $request): JsonResponse
+    public function google(Request $request, GoogleIdentityTokenVerifier $verifier): JsonResponse
     {
         $validated = $request->validate(['id_token' => ['required', 'string', 'max:10000']]);
         $clientId = (string) config('services.google.web_client_id');
@@ -387,7 +407,7 @@ class AuthController extends ApiController
             return $this->fail('Google sign-in is not configured.', 503);
         }
         try {
-            $payload = (new GoogleClient(['client_id' => $clientId]))->verifyIdToken($validated['id_token']);
+            $payload = $verifier->verify($validated['id_token'], $clientId);
         } catch (\Throwable) {
             $payload = false;
         }
@@ -396,7 +416,12 @@ class AuthController extends ApiController
         }
         $email = mb_strtolower($payload['email']);
         $user = DB::transaction(function () use ($payload, $email) {
-            $user = User::where('google_id', $payload['sub'])->orWhere('email', $email)->lockForUpdate()->first();
+            $user = User::where('google_id', $payload['sub'])->lockForUpdate()->first();
+            if (! $user) {
+                if (User::where('email', $email)->exists()) {
+                    return null;
+                }
+            }
             if (! $user) {
                 return User::create([
                     'google_id' => $payload['sub'], 'email' => $email,
@@ -405,13 +430,166 @@ class AuthController extends ApiController
                     'profile_complete' => false, 'is_active' => true,
                 ]);
             }
-            $user->update(['google_id' => $payload['sub'], 'email_verified_at' => $user->email_verified_at ?? now()]);
             return $user;
         }, 3);
+        if (! $user) {
+            return $this->fail('This email belongs to an existing account. Sign in to that account and link Google explicitly.', 409);
+        }
         if (! $user->is_active) {
             return $this->fail('Your account has been deactivated.', 403);
         }
         return $this->issueMobileToken($user, $user->wasRecentlyCreated, 'Signed in with Google.');
+    }
+
+    public function linkGoogle(Request $request, GoogleIdentityTokenVerifier $verifier): JsonResponse
+    {
+        $validated = $request->validate(['id_token' => ['required', 'string', 'max:10000']]);
+        $clientId = (string) config('services.google.web_client_id');
+        if ($clientId === '') {
+            return $this->fail('Google sign-in is not configured.', 503);
+        }
+        try {
+            $identity = $verifier->verify($validated['id_token'], $clientId);
+        } catch (\Throwable) {
+            return $this->fail('Invalid Google identity token.', 401);
+        }
+        if (! $identity || empty($identity['sub']) || empty($identity['email_verified'])) {
+            return $this->fail('Invalid Google identity token.', 401);
+        }
+
+        $linked = DB::transaction(function () use ($request, $identity): bool {
+            $user = User::whereKey($request->user()->id)->lockForUpdate()->firstOrFail();
+            if (($user->google_id && $user->google_id !== $identity['sub']) ||
+                User::where('google_id', $identity['sub'])->whereKeyNot($user->id)->exists()) {
+                return false;
+            }
+            $user->update(['google_id' => $identity['sub']]);
+            return true;
+        }, 3);
+
+        return $linked ? $this->ok(['linked' => true]) : $this->fail('Google identity is already linked to another account.', 409);
+    }
+
+    public function appleChallenge(): JsonResponse
+    {
+        if (! config('services.apple.bundle_id') && ! config('services.apple.service_id')) {
+            return $this->fail('Apple sign-in is not configured.', 503);
+        }
+
+        $nonce = bin2hex(random_bytes(32));
+        Cache::put('auth:apple:nonce:'.hash('sha256', $nonce), true, now()->addMinutes(5));
+
+        return $this->ok(['nonce' => $nonce, 'expires_in' => 300]);
+    }
+
+    /** Apple posts its web/Android authorization result here; only the fixed app deep link is allowed. */
+    public function appleCallback(Request $request)
+    {
+        $values = $request->only(['code', 'id_token', 'state', 'user', 'error']);
+        $package = (string) config('services.apple.android_package');
+        if (! preg_match('/^[a-zA-Z][a-zA-Z0-9_.]*$/', $package)) {
+            abort(503, 'Apple Android package is not configured.');
+        }
+
+        $query = http_build_query($values, '', '&', PHP_QUERY_RFC3986);
+        $url = 'intent://callback?'.$query.'#Intent;package='.$package.';scheme=signinwithapple;end';
+
+        return response('', 302)->header('Location', $url);
+    }
+
+    public function apple(Request $request, AppleIdentityTokenVerifier $verifier): JsonResponse
+    {
+        $validated = $request->validate([
+            'id_token' => ['required', 'string', 'max:10000'],
+            'nonce' => ['required', 'string', 'size:64', 'regex:/^[a-f0-9]+$/'],
+            'name' => ['nullable', 'string', 'max:120'],
+        ]);
+        if (! config('services.apple.bundle_id') && ! config('services.apple.service_id')) {
+            return $this->fail('Apple sign-in is not configured.', 503);
+        }
+
+        try {
+            $identity = $verifier->verify($validated['id_token'], $validated['nonce']);
+        } catch (\Throwable) {
+            return $this->fail('Invalid Apple identity token.', 401);
+        }
+
+        $key = 'auth:apple:nonce:'.hash('sha256', $validated['nonce']);
+        if (! Cache::pull($key)) {
+            return $this->fail('Apple sign-in challenge expired or was already used.', 401);
+        }
+
+        $email = isset($identity['email']) && is_string($identity['email'])
+            ? mb_strtolower($identity['email']) : null;
+        $emailVerified = in_array($identity['email_verified'] ?? false, [true, 'true'], true);
+        if ($email && (! filter_var($email, FILTER_VALIDATE_EMAIL) || ! $emailVerified)) {
+            return $this->fail('Apple email is not verified.', 401);
+        }
+
+        $user = DB::transaction(function () use ($identity, $email, $validated) {
+            $user = User::where('apple_id', $identity['sub'])->lockForUpdate()->first();
+            if ($user) {
+                return $user;
+            }
+            if ($email) {
+                if (User::where('email', $email)->exists()) {
+                    return null;
+                }
+            }
+
+            return User::create([
+                'apple_id' => $identity['sub'],
+                'email' => $email,
+                'email_verified_at' => $email ? now() : null,
+                'name' => trim($validated['name'] ?? '') ?: 'Apple User',
+                'member_since' => now()->toDateString(),
+                'profile_complete' => false,
+                'is_active' => true,
+            ]);
+        }, 3);
+
+        if (! $user) {
+            return $this->fail('This email belongs to an existing account. Sign in to that account and link Apple explicitly.', 409);
+        }
+        if (! $user->is_active) {
+            return $this->fail('Your account has been deactivated.', 403);
+        }
+
+        return $this->issueMobileToken($user, $user->wasRecentlyCreated, 'Signed in with Apple.');
+    }
+
+    public function linkApple(Request $request, AppleIdentityTokenVerifier $verifier): JsonResponse
+    {
+        $validated = $request->validate([
+            'id_token' => ['required', 'string', 'max:10000'],
+            'nonce' => ['required', 'string', 'size:64', 'regex:/^[a-f0-9]+$/'],
+        ]);
+        if (! config('services.apple.bundle_id') && ! config('services.apple.service_id')) {
+            return $this->fail('Apple sign-in is not configured.', 503);
+        }
+        try {
+            $identity = $verifier->verify($validated['id_token'], $validated['nonce']);
+        } catch (\Throwable) {
+            return $this->fail('Invalid Apple identity token.', 401);
+        }
+        if (! Cache::pull('auth:apple:nonce:'.hash('sha256', $validated['nonce']))) {
+            return $this->fail('Apple sign-in challenge expired or was already used.', 401);
+        }
+        if (empty($identity['sub'])) {
+            return $this->fail('Invalid Apple identity token.', 401);
+        }
+
+        $linked = DB::transaction(function () use ($request, $identity): bool {
+            $user = User::whereKey($request->user()->id)->lockForUpdate()->firstOrFail();
+            if (($user->apple_id && $user->apple_id !== $identity['sub']) ||
+                User::where('apple_id', $identity['sub'])->whereKeyNot($user->id)->exists()) {
+                return false;
+            }
+            $user->update(['apple_id' => $identity['sub']]);
+            return true;
+        }, 3);
+
+        return $linked ? $this->ok(['linked' => true]) : $this->fail('Apple identity is already linked to another account.', 409);
     }
 
     private function issueMobileToken(User $user, bool $isNew, string $message): JsonResponse
