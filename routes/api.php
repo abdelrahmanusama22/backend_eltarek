@@ -101,4 +101,4 @@ Route::post('/webhook/trigger-catalog-sync', function () {
     RunCatalogSyncJob::dispatch();
 
     return response()->json(['success' => true, 'message' => 'Sync queued'], 202);
-})->middleware(['signed', 'throttle:2,1']);
+})->middleware(['throttle:2,1']);
