@@ -6,9 +6,7 @@ use Illuminate\Support\Facades\Route;
 
 Route::get('/health', HealthController::class)->name('health');
 
-Route::get('/', function () {
-    return view('welcome');
-});
+Route::redirect('/', '/admin');
 
 Route::match(['GET', 'HEAD', 'OPTIONS'], '/media/{path}', function ($path) {
     if (request()->getMethod() === 'OPTIONS') {
