@@ -99,6 +99,60 @@ class BranchForm
                 Section::make('الموقع الجغرافي')
                     ->description('حدد موقع الفرع على الخريطة بدقة')
                     ->schema([
+                        TextInput::make('google_map_link')
+                            ->label('رابط خرائط جوجل (اختياري)')
+                            ->hint('قم بلصق رابط خرائط جوجل (مثل https://maps.app.goo.gl/...) لاستخراج الإحداثيات تلقائياً')
+                            ->url()
+                            ->lazy()
+                            ->afterStateUpdated(function ($state, $set) {
+                                if (! $state) {
+                                    return;
+                                }
+                                
+                                $url = $state;
+                                
+                                if (str_contains($url, 'maps.app.goo.gl') || str_contains($url, 'goo.gl/maps') || str_contains($url, 'maps.google.com')) {
+                                    $ch = curl_init($url);
+                                    curl_setopt($ch, CURLOPT_HEADER, true);
+                                    curl_setopt($ch, CURLOPT_NOBODY, true);
+                                    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+                                    curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
+                                    curl_setopt($ch, CURLOPT_MAXREDIRS, 10);
+                                    curl_setopt($ch, CURLOPT_TIMEOUT, 10);
+                                    // Set a user agent to prevent some servers from rejecting the request
+                                    curl_setopt($ch, CURLOPT_USERAGENT, 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)');
+                                    curl_exec($ch);
+                                    $effectiveUrl = curl_getinfo($ch, CURLINFO_EFFECTIVE_URL);
+                                    curl_close($ch);
+                                    if ($effectiveUrl) {
+                                        $url = $effectiveUrl;
+                                    }
+                                }
+                                
+                                $lat = null;
+                                $lng = null;
+                                
+                                if (preg_match('/@(-?\d+\.\d+),(-?\d+\.\d+)/', $url, $matches)) {
+                                    $lat = (float) $matches[1];
+                                    $lng = (float) $matches[2];
+                                } elseif (preg_match('/query=(-?\d+\.\d+),(-?\d+\.\d+)/', $url, $matches)) {
+                                    $lat = (float) $matches[1];
+                                    $lng = (float) $matches[2];
+                                } elseif (preg_match('/q=(-?\d+\.\d+),(-?\d+\.\d+)/', $url, $matches)) {
+                                    $lat = (float) $matches[1];
+                                    $lng = (float) $matches[2];
+                                } elseif (preg_match('/search\/(-?\d+\.\d+),(-?\d+\.\d+)/', $url, $matches)) {
+                                    $lat = (float) $matches[1];
+                                    $lng = (float) $matches[2];
+                                }
+
+                                if ($lat !== null && $lng !== null) {
+                                    $set('lat', $lat);
+                                    $set('lng', $lng);
+                                    $set('location', ['lat' => $lat, 'lng' => $lng]);
+                                }
+                            })
+                            ->columnSpanFull(),
                         Map::make('location')
                             ->label('الموقع (قم بسحب الدبوس لتحديد المكان)')
                             ->columnSpanFull()

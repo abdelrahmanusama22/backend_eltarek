@@ -382,13 +382,21 @@ class AuthController extends ApiController
     public function google(Request $request): JsonResponse
     {
         $validated = $request->validate(['id_token' => ['required', 'string', 'max:10000']]);
-        $clientId = (string) config('services.google.web_client_id');
-        if ($clientId === '') {
+        
+        $clientIds = array_filter([
+            config('services.google.client_id'),
+            config('services.google.web_client_id'),
+            config('services.google.android_client_id'),
+        ]);
+
+        if (empty($clientIds)) {
             return $this->fail('Google sign-in is not configured.', 503);
         }
+
         try {
-            $payload = (new GoogleClient(['client_id' => $clientId]))->verifyIdToken($validated['id_token']);
-        } catch (\Throwable) {
+            // GoogleClient accepts an array of client IDs to allow token validation from multiple platforms
+            $payload = app(GoogleClient::class, ['config' => ['client_id' => array_values($clientIds)]])->verifyIdToken($validated['id_token']);
+        } catch (\Throwable $e) {
             $payload = false;
         }
         if (! $payload || empty($payload['sub']) || empty($payload['email']) || empty($payload['email_verified'])) {
@@ -448,3 +456,5 @@ class AuthController extends ApiController
         return preg_match('/^1[0125]\d{8}$/', $digits) ? '+20'.$digits : null;
     }
 }
+
+

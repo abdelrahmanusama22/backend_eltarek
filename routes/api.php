@@ -49,7 +49,7 @@ Route::prefix('v1')->group(function () {
     Route::get('vehicles/{vehicle}', [VehicleController::class, 'show']);
     Route::get('vehicles/{vehicle}/trims', [VehicleController::class, 'trims']);
     Route::get('trims/{trim}', [VehicleController::class, 'trimDetail']);
-
+Route::get('showrooms/filter', [\App\Http\Controllers\Api\ShowroomController::class, 'filter']);
     Route::get('brands', [BrandController::class, 'index']);
     Route::get('brands/{brand}', [BrandController::class, 'show']);
 

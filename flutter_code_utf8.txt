@@ -1,0 +1,766 @@
+=== C:\flutter\eltarekapp\lib\core\services\google_auth_service.dart ===
+import 'package:flutter/foundation.dart';
+import 'package:google_sign_in/google_sign_in.dart';
+
+/// Thin wrapper around the google_sign_in **v7** API.
+///
+/// Flow:
+///  1. [attemptLightweightAuthentication] – restores a previous session with
+///     minimal / no UI (equivalent to the old `signInSilently`).
+///  2. If that returns null, fall through to the full interactive [authenticate].
+///
+/// The Web Client ID is passed as [serverClientId] on Android / iOS so that
+/// the backend can verify the resulting ID token.
+abstract final class GoogleAuthService {
+  static const _webClientId =
+      '1042945824102-jtp8tdh929gdb89n5aoji4qi6tdro811.apps.googleusercontent.com';
+
+  static bool _initialized = false;
+
+  static Future<void> _ensureInitialized() async {
+    if (_initialized) return;
+    await GoogleSignIn.instance.initialize(
+      // On web the clientId must be set; on Android/iOS the serverClientId
+      // is what allows the backend to receive a verifiable ID token.
+      clientId: kIsWeb ? _webClientId : null,
+      serverClientId: kIsWeb ? null : _webClientId,
+    );
+    _initialized = true;
+  }
+
+  /// Signs the user in with Google and returns the ID token string, or `null`
+  /// if the user explicitly cancelled the picker.
+  ///
+  /// Throws a [GoogleAuthException] on configuration or network errors.
+  static Future<String?> getIdToken() async {
+    await _ensureInitialized();
+
+    GoogleSignInAccount? account;
+
+    // ── 1. Try lightweight / silent restore first ───────────────────────────
+    // attemptLightweightAuthentication returns a Future? (nullable future).
+    // If the platform doesn't support it, the method itself returns null.
+    final silentFuture = GoogleSignIn.instance
+        .attemptLightweightAuthentication();
+    if (silentFuture != null) {
+      try {
+        account = await silentFuture;
+      } catch (_) {
+        // Silent path failing is normal – fall through to interactive.
+      }
+    }
+
+    // ── 2. Interactive sign-in when silent fails or is unsupported ──────────
+    account ??= await GoogleSignIn.instance.authenticate();
+
+    final idToken = account.authentication.idToken;
+    if (idToken == null) {
+      throw const GoogleAuthException(
+        'Google did not return an ID token. '
+        'Ensure the Web Client ID is set as serverClientId and that '
+        'google-services.json is present in android/app/.',
+      );
+    }
+    return idToken;
+  }
+
+  /// Signs the user out of Google (clears cached credentials).
+  static Future<void> signOut() async {
+    if (!_initialized) return;
+    try {
+      await GoogleSignIn.instance.signOut();
+    } catch (_) {}
+  }
+}
+
+/// Thrown by [GoogleAuthService] on configuration or network errors.
+class GoogleAuthException implements Exception {
+  const GoogleAuthException(this.message);
+  final String message;
+
+  @override
+  String toString() => message;
+}
+
+=== C:\flutter\eltarekapp\lib\core\api\backend_gateway.dart ===
+import 'dart:convert';
+
+import 'package:flutter/foundation.dart';
+
+import '../data/catalog_store.dart';
+import '../data/catalog_repository.dart';
+import '../models/models.dart';
+import '../state/app_state.dart';
+import 'api_client.dart';
+import '../services/token_store.dart';
+
+/// All app ↔ backend traffic goes through here. Every call degrades
+/// gracefully: if the backend is unreachable the app keeps working from the
+/// bundled catalog and local state, exactly as before the backend existed.
+abstract final class BackendGateway {
+  /// Fetches the full catalog and hydrates [CatalogStore]. Silent on failure.
+  static Future<void> bootstrap() async {
+    await CatalogRepository.initialize();
+    debugPrint('Catalog repository synchronized from ${Api.baseUrl}');
+  }
+
+  // ------------------------------------------------------------------ auth
+
+  static Future<ApiResult> sendOtp(String phone) =>
+      Api.post('/auth/send-otp', {'phone': phone, 'country_code': '+20'});
+
+  static Future<ApiResult> resendOtp(String phone) =>
+      Api.post('/auth/resend-otp', {'phone': phone});
+
+  /// On success stores the token and returns the result; `profile_complete`
+  /// in the data tells the caller whether step 3 is needed.
+  static Future<ApiResult> verifyOtp(String phone, String otp) async {
+    final result = await Api.post('/auth/verify-otp', {
+      'phone': phone,
+      'otp': otp,
+    }, true);
+    if (result.ok) {
+      final t = result.data?['access_token'] as String?;
+      Api.token = t;
+      if (t != null) {
+        await TokenStore.write(t);
+      }
+    }
+    return result;
+  }
+
+  static Future<ApiResult> emailLogin(String email, String password) =>
+      _storeAuthResult(
+        Api.post('/auth/email/login', {'email': email, 'password': password}),
+      );
+
+  static Future<ApiResult> emailRegister(
+    String name,
+    String email,
+    String password,
+  ) => _storeAuthResult(
+    Api.post('/auth/email/register', {
+      'name': name,
+      'email': email,
+      'password': password,
+      'password_confirmation': password,
+    }, true),
+  );
+
+  static Future<ApiResult> googleLogin(String idToken) =>
+      _storeAuthResult(Api.post('/auth/google', {'id_token': idToken}, true));
+
+  static Future<ApiResult> forgotPassword(String email) =>
+      Api.post('/auth/email/forgot-password', {'email': email});
+
+  static Future<ApiResult> resetPassword({
+    required String email,
+    required String code,
+    required String password,
+  }) => Api.post('/auth/email/reset-password', {
+    'email': email,
+    'code': code,
+    'password': password,
+    'password_confirmation': password,
+  }, true);
+
+  static Future<ApiResult> verifyEmail(String code) =>
+      Api.post('/auth/email/verify', {'code': code});
+
+  static Future<ApiResult> resendVerification() =>
+      Api.post('/auth/email/resend-verification');
+
+  static Future<ApiResult> _storeAuthResult(Future<ApiResult> request) async {
+    final result = await request;
+    if (result.ok) {
+      final token = result.data?['access_token'] as String?;
+      Api.token = token;
+      if (token != null) await TokenStore.write(token);
+    }
+    return result;
+  }
+
+  static Future<ApiResult> completeProfile({
+    required String fullName,
+    required int age,
+    required int cityId,
+    String? email,
+  }) => Api.post('/auth/complete-profile', {
+    'full_name': fullName,
+    'age': age,
+    'city_id': cityId,
+    if (email case final String e when e.isNotEmpty) 'email': e,
+  });
+
+  /// Builds a [UserProfile] from a profile payload; null when shape is off.
+  static UserProfile? profileFromJson(Map<String, dynamic>? data) {
+    if (data == null || data['full_name'] == null) return null;
+    final cityJson = data['city'];
+    final vip = data['vip'] is Map ? data['vip'] as Map : const {};
+    final memberSinceRaw =
+        '${vip['member_since'] ?? data['member_since'] ?? data['created_at'] ?? ''}';
+    final memberYear =
+        int.tryParse(memberSinceRaw.split('-').first) ?? DateTime.now().year;
+
+    return UserProfile(
+      fullName: '${data['full_name']}',
+      email: '${data['email'] ?? ''}',
+      phone: '${data['phone'] ?? ''}',
+      city: cityJson is Map
+          ? City.fromJson(Map<String, dynamic>.from(cityJson))
+          : CatalogStore.defaultCity,
+      age: data['age'] is int ? data['age'] as int : null,
+      vipTier: '${vip['tier'] ?? data['vip_tier'] ?? 'silver'}',
+      vipPoints: (vip['points'] ?? data['vip_points'] ?? 0) is int
+          ? (vip['points'] ?? data['vip_points'] ?? 0) as int
+          : 0,
+      memberSince: memberYear,
+      pointsToNextTier: vip['points_to_next_tier'] is int
+          ? vip['points_to_next_tier'] as int
+          : 0,
+      avatarUrl: Api.resolveAssetUrl(data['avatar_url']?.toString()),
+    );
+  }
+
+  static Future<ApiResult> fetchProfile() => Api.get('/profile');
+
+  static Future<ApiResult> uploadAvatar(List<int> bytes, String filename) =>
+      Api.post(
+        '/profile/avatar',
+        {'avatar_base64': base64Encode(bytes)},
+        false,
+        const Duration(seconds: 60),
+      );
+
+  static Future<ApiResult> updateProfile({
+    required String fullName,
+    required int age,
+    required int cityId,
+  }) => Api.put('/profile', {
+    'full_name': fullName,
+    'age': age,
+    'city_id': cityId,
+  });
+
+  static Future<ApiResult> fetchPointsHistory() =>
+      Api.get('/profile/points-history');
+
+  static Future<ApiResult> fetchFavorites() => Api.get('/profile/favorites');
+  static Future<ApiResult> fetchRewards() => Api.get('/profile/rewards');
+  static Future<ApiResult> fetchRedemptions() =>
+      Api.get('/profile/redemptions');
+  static Future<ApiResult> fetchNotifications() => Api.get('/notifications');
+  static Future<ApiResult> markAllNotificationsRead() =>
+      Api.post('/notifications/mark-all-read');
+  static Future<ApiResult> fetchBenefits() => Api.get('/profile/vip/benefits');
+  static Future<ApiResult> fetchGarage() => Api.get('/profile/garage');
+  static Future<ApiResult> fetchGarageLinkRequests() =>
+      Api.get('/profile/garage-link-requests');
+  static Future<ApiResult> requestGarageLink(
+    String identifier,
+    String carName,
+  ) => Api.post('/profile/garage-link-requests', {
+    'identifier': identifier,
+    if (carName.isNotEmpty) 'car_name': carName,
+  }, true);
+  static Future<ApiResult> cancelGarageLinkRequest(int id) =>
+      Api.delete('/profile/garage-link-requests/$id');
+
+  static Future<void> logout() async {
+    if (Api.token != null) await Api.post('/auth/logout');
+    Api.token = null;
+    await TokenStore.clear();
+  }
+
+  // ------------------------------------------------------------- mutations
+  static Future<ApiResult> fetchHomeData() => Api.get('/home');
+  static Future<ApiResult> checkFinanceEligibility({
+    required int monthlyIncomeEgp,
+    required String employmentType,
+    int? trimId,
+  }) {
+    final body = <String, dynamic>{
+      'monthly_income_egp': monthlyIncomeEgp,
+      'employment_type': employmentType,
+    };
+    if (trimId != null) body['trim_id'] = trimId;
+    return Api.post('/finance/eligibility', body);
+  }
+
+  static Future<ApiResult> fetchCompare(List<int> trimIds) =>
+      Api.get('/compare?trim_ids=${trimIds.join(',')}');
+  static Future<ApiResult> fetchCompareSelection() =>
+      Api.get('/compare/selection');
+  static Future<ApiResult> addCompare(int trimId) =>
+      Api.post('/compare', {'trim_id': trimId});
+  static Future<ApiResult> removeCompare(int trimId) =>
+      Api.delete('/compare/$trimId');
+
+  static Future<ApiResult> fetchTestDriveFleet() =>
+      Api.get('/test-drives/fleet');
+  static Future<ApiResult> fetchTestDriveSlots() =>
+      Api.get('/test-drives/slots');
+  static Future<ApiResult> fetchMyBookings() => Api.get('/test-drives');
+
+  /// Mirrors a local favorite toggle to the server (fire and forget).
+  static Future<ApiResult> syncFavorite(int trimId) => Api.token == null
+      ? Future.value(const ApiResult(ok: true))
+      : Api.post('/trims/$trimId/favorite');
+
+  /// Creates the booking server-side; returns the server result but the
+  /// caller has already stored it locally, so failure is non-fatal.
+  static Future<ApiResult> createBooking({
+    required int trimId,
+    required int branchId,
+    required String? date,
+    required String dayLabel,
+    required String time,
+  }) => Api.post('/test-drives', {
+    'trim_id': trimId,
+    'branch_id': branchId,
+    'date': date,
+    'day_label': dayLabel,
+    'time': time,
+  }, true);
+
+  static Future<ApiResult> cancelBooking(int serverId) => Api.token == null
+      ? Future.value(
+          const ApiResult(ok: false, message: 'Authentication required.'),
+        )
+      : Api.delete('/test-drives/$serverId');
+
+  static Future<ApiResult> redeemReward(int rewardId) =>
+      Api.post('/profile/rewards/redeem', {'reward_id': rewardId}, true);
+}
+
+/// Keeps [Api.language] in sync with the app locale.
+void syncApiLanguage(AppState state) {
+  Api.language = state.languageCode;
+}
+
+=== C:\flutter\eltarekapp\lib\features\auth\login_screen.dart ===
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+
+import '../../core/api/backend_gateway.dart';
+import '../../core/services/google_auth_service.dart';
+import '../../core/i18n/app_strings.dart';
+import '../../core/theme/app_colors.dart';
+import '../../core/widgets/eltarek_logo.dart';
+import '../../core/widgets/ui.dart';
+import 'otp_screen.dart';
+import 'email_auth_screen.dart';
+import 'complete_profile_screen.dart';
+
+/// Step 1 — phone entry with Egyptian +20 prefix and social sign-in.
+class LoginScreen extends StatefulWidget {
+  const LoginScreen({super.key});
+
+  @override
+  State<LoginScreen> createState() => _LoginScreenState();
+}
+
+class _LoginScreenState extends State<LoginScreen> {
+  final TextEditingController _phone = TextEditingController();
+  bool _agreed = false;
+  bool _sending = false;
+
+  @override
+  void dispose() {
+    _phone.dispose();
+    super.dispose();
+  }
+
+  bool get _validPhone {
+    return RegExp(r'^1[0125]\d{8}$').hasMatch(_normalizedPhoneDigits);
+  }
+
+  String get _normalizedPhoneDigits {
+    final digits = _phone.text.replaceAll(RegExp(r'\D'), '');
+    return digits.startsWith('0') ? digits.substring(1) : digits;
+  }
+
+  Future<void> _continue() async {
+    if (!_validPhone) {
+      showAppSnack(context, tr(context, 'auth.invalid_phone'), error: true);
+      return;
+    }
+    if (!_agreed) {
+      showAppSnack(context, tr(context, 'auth.accept_terms'), error: true);
+      return;
+    }
+    final digits = _normalizedPhoneDigits;
+    setState(() => _sending = true);
+    // Real OTP via backend (SMS Misr); when the backend is unreachable the
+    // flow continues in mock mode where any 4-digit code verifies.
+    final result = await BackendGateway.sendOtp('+20$digits');
+    if (!mounted) return;
+    setState(() => _sending = false);
+    if (!result.ok && !result.offline) {
+      showAppSnack(context, result.message ?? 'Error', error: true);
+      return;
+    }
+    Navigator.of(
+      context,
+    ).push(MaterialPageRoute(builder: (_) => OtpScreen(phone: '+20 $digits')));
+  }
+
+  Future<void> _google() async {
+    if (!_agreed) {
+      showAppSnack(context, tr(context, 'auth.accept_terms'), error: true);
+      return;
+    }
+    setState(() => _sending = true);
+    try {
+      final token = await GoogleAuthService.getIdToken();
+      if (token == null) return;
+      final result = await BackendGateway.googleLogin(token);
+      if (!mounted) return;
+      if (!result.ok) {
+        throw StateError(result.message ?? 'Google sign-in failed.');
+      }
+      final profileResult = await BackendGateway.fetchProfile();
+      final profile = BackendGateway.profileFromJson(profileResult.data);
+      if (!mounted || profile == null) return;
+      Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => CompleteProfileScreen(
+            initialName: profile.fullName,
+            initialEmail: profile.email,
+            emailVerified: true,
+          ),
+        ),
+      );
+    } catch (e) {
+      if (mounted) showAppSnack(context, e.toString(), error: true);
+    } finally {
+      if (mounted) setState(() => _sending = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final text = Theme.of(context).textTheme;
+
+    return Scaffold(
+      appBar: AppBar(
+        leading: const DirectionalBackButton(),
+        title: const ElTarekMark(size: 26),
+        actions: const [
+          Padding(
+            padding: EdgeInsetsDirectional.only(end: 16),
+            child: LanguageToggle(),
+          ),
+        ],
+      ),
+      body: SafeArea(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.fromLTRB(24, 16, 24, 32),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              const SizedBox(height: 8),
+              Center(
+                child: Container(
+                  width: 96,
+                  height: 96,
+                  decoration: const BoxDecoration(
+                    color: AppColors.redSoft,
+                    shape: BoxShape.circle,
+                  ),
+                  alignment: Alignment.center,
+                  child: const ElTarekMark(size: 40),
+                ),
+              ),
+              const SizedBox(height: 22),
+              Text(
+                tr(context, 'auth.welcome_title'),
+                textAlign: TextAlign.center,
+                style: text.headlineSmall?.copyWith(
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                tr(context, 'auth.welcome_sub'),
+                textAlign: TextAlign.center,
+                style: text.bodyMedium?.copyWith(color: AppColors.slate),
+              ),
+              const SizedBox(height: 26),
+              _StepPills(current: 0),
+              const SizedBox(height: 22),
+
+              // Phone card
+              AppCard(
+                padding: const EdgeInsets.all(20),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            tr(context, 'auth.phone_number').toUpperCase(),
+                            style: text.labelSmall?.copyWith(
+                              letterSpacing: 1.2,
+                              fontWeight: FontWeight.w800,
+                              color: AppColors.slate,
+                            ),
+                          ),
+                        ),
+                        const Icon(
+                          Icons.smartphone_rounded,
+                          size: 18,
+                          color: AppColors.red,
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 14),
+                    Directionality(
+                      // Phone numbers always read LTR.
+                      textDirection: TextDirection.ltr,
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.center,
+                        children: [
+                          const Text('🇪🇬', style: TextStyle(fontSize: 22)),
+                          const SizedBox(width: 8),
+                          Text(
+                            '+20',
+                            style: text.titleMedium?.copyWith(
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          Container(
+                            width: 1,
+                            height: 28,
+                            color: AppColors.mist,
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: TextField(
+                              controller: _phone,
+                              keyboardType: TextInputType.phone,
+                              inputFormatters: [
+                                FilteringTextInputFormatter.digitsOnly,
+                                LengthLimitingTextInputFormatter(11),
+                              ],
+                              onChanged: (_) => setState(() {}),
+                              style: text.titleMedium?.copyWith(
+                                fontWeight: FontWeight.w700,
+                                letterSpacing: 1.2,
+                              ),
+                              decoration: const InputDecoration(
+                                hintText: '100 000 0000',
+                                filled: false,
+                                border: UnderlineInputBorder(),
+                                enabledBorder: UnderlineInputBorder(
+                                  borderSide: BorderSide(color: AppColors.mist),
+                                ),
+                                focusedBorder: UnderlineInputBorder(
+                                  borderSide: BorderSide(
+                                    color: AppColors.red,
+                                    width: 1.6,
+                                  ),
+                                ),
+                                contentPadding: EdgeInsets.symmetric(
+                                  vertical: 8,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 24),
+              PrimaryButton(
+                label: _sending ? '…' : tr(context, 'common.continue'),
+                icon: Directionality.of(context) == TextDirection.rtl
+                    ? Icons.arrow_back_rounded
+                    : Icons.arrow_forward_rounded,
+                onPressed: _validPhone && _agreed && !_sending
+                    ? _continue
+                    : null,
+              ),
+              const SizedBox(height: 28),
+              _OrDivider(label: tr(context, 'auth.or_connect')),
+              const SizedBox(height: 18),
+              Row(
+                children: [
+                  Expanded(
+                    child: _SocialButton(
+                      label: 'Google',
+                      icon: Icons.g_mobiledata_rounded,
+                      onTap: _agreed && !_sending ? _google : null,
+                    ),
+                  ),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: _SocialButton(
+                      label: 'Email',
+                      icon: Icons.alternate_email_rounded,
+                      onTap: _agreed && !_sending
+                          ? () => Navigator.of(context).push(
+                              MaterialPageRoute(
+                                builder: (_) => const EmailAuthScreen(),
+                              ),
+                            )
+                          : null,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 26),
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  SizedBox(
+                    width: 24,
+                    height: 24,
+                    child: Checkbox(
+                      value: _agreed,
+                      activeColor: AppColors.red,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      onChanged: (v) => setState(() => _agreed = v ?? false),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text.rich(
+                      TextSpan(
+                        style: text.bodySmall?.copyWith(
+                          color: AppColors.slate,
+                          height: 1.5,
+                        ),
+                        children: [
+                          TextSpan(text: tr(context, 'auth.terms_prefix')),
+                          TextSpan(
+                            text: tr(context, 'auth.terms'),
+                            style: const TextStyle(
+                              color: AppColors.red,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                          TextSpan(text: tr(context, 'auth.and')),
+                          TextSpan(
+                            text: tr(context, 'auth.privacy'),
+                            style: const TextStyle(
+                              color: AppColors.red,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _StepPills extends StatelessWidget {
+  const _StepPills({required this.current});
+
+  final int current;
+
+  @override
+  Widget build(BuildContext context) {
+    Widget pill(String label, bool active) => Expanded(
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 250),
+        padding: const EdgeInsets.symmetric(vertical: 10),
+        decoration: BoxDecoration(
+          color: active ? AppColors.red : AppColors.cloud,
+          borderRadius: BorderRadius.circular(24),
+        ),
+        alignment: Alignment.center,
+        child: Text(
+          label,
+          style: TextStyle(
+            color: active ? Colors.white : AppColors.slate,
+            fontWeight: FontWeight.w800,
+            fontSize: 12.5,
+          ),
+        ),
+      ),
+    );
+
+    return Row(
+      children: [
+        pill(tr(context, 'auth.step1'), current == 0),
+        const SizedBox(width: 10),
+        pill(tr(context, 'auth.step2'), current == 1),
+      ],
+    );
+  }
+}
+
+class _OrDivider extends StatelessWidget {
+  const _OrDivider({required this.label});
+
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        const Expanded(child: Divider()),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12),
+          child: Text(
+            label,
+            style: Theme.of(context).textTheme.labelSmall?.copyWith(
+              color: AppColors.silver,
+              letterSpacing: 1.2,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+        ),
+        const Expanded(child: Divider()),
+      ],
+    );
+  }
+}
+
+class _SocialButton extends StatelessWidget {
+  const _SocialButton({
+    required this.label,
+    required this.icon,
+    required this.onTap,
+  });
+
+  final String label;
+  final IconData icon;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return OutlinedButton.icon(
+      onPressed: onTap,
+      icon: Icon(
+        icon,
+        size: 22,
+        color: onTap == null ? AppColors.silver : AppColors.ink,
+      ),
+      label: Text(label),
+      style: OutlinedButton.styleFrom(
+        foregroundColor: AppColors.ink,
+        minimumSize: const Size(0, 52),
+        side: const BorderSide(color: AppColors.mist, width: 1.3),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        textStyle: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15),
+      ),
+    );
+  }
+}
+
