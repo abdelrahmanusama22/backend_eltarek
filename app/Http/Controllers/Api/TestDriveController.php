@@ -20,6 +20,7 @@ class TestDriveController extends ApiController
     public function fleet(): JsonResponse
     {
         $fleet = Trim::with('vehicle')
+            ->has('vehicle')
             ->where('active', true)
             ->where('in_test_drive_fleet', true)
             ->orderBy('fleet_sort')
@@ -27,10 +28,10 @@ class TestDriveController extends ApiController
 
         return $this->ok($fleet->map(fn (Trim $t) => [
             'trim_id' => $t->id,
-            'name' => $t->vehicle->model,
-            'name_ar' => $t->vehicle->model_ar,
+            'name' => $t->vehicle?->model ?? 'Unknown',
+            'name_ar' => $t->vehicle?->model_ar ?? 'Unknown',
             'subtitle' => $t->subtitle,
-            'image_url' => $t->vehicle->resolved_image_url,
+            'image_url' => $t->vehicle?->resolved_image_url,
         ]));
     }
 
