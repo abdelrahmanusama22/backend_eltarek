@@ -393,11 +393,17 @@ class AuthController extends ApiController
             return $this->fail('Google sign-in is not configured.', 503);
         }
 
-        try {
-            // GoogleClient accepts an array of client IDs to allow token validation from multiple platforms
-            $payload = app(GoogleClient::class, ['config' => ['client_id' => array_values($clientIds)]])->verifyIdToken($validated['id_token']);
-        } catch (\Throwable $e) {
-            $payload = false;
+        $payload = false;
+        foreach ($clientIds as $clientId) {
+            try {
+                $client = new GoogleClient(['client_id' => (string) $clientId]);
+                $payload = $client->verifyIdToken($validated['id_token']);
+                if ($payload) {
+                    break;
+                }
+            } catch (\Throwable $e) {
+                continue;
+            }
         }
         if (! $payload || empty($payload['sub']) || empty($payload['email']) || empty($payload['email_verified'])) {
             return $this->fail('Invalid Google identity token.', 401);
