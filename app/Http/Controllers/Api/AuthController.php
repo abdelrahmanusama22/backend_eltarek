@@ -292,14 +292,15 @@ class AuthController extends ApiController
     /** Step 1 — request a password-reset code (public). */
     public function forgotPassword(Request $request): JsonResponse
     {
-        $request->validate(['email' => ['required', 'email', 'max:190']]);
+        $request->validate([
+            'email' => ['required', 'email', 'max:190', 'exists:users,email']
+        ]);
 
         $email = mb_strtolower($request->string('email')->toString());
         $user  = User::where('email', $email)->first();
 
-        // Always respond OK to avoid email enumeration.
-        if (! $user || ! $user->is_active) {
-            return $this->ok(null, 'If an account exists for that email, a reset code has been sent.');
+        if (! $user->is_active) {
+            return $this->fail('Your account has been deactivated.', 403);
         }
 
         $ttl     = 10 * 60; // 10 minutes
@@ -308,13 +309,9 @@ class AuthController extends ApiController
 
         Cache::put($cacheKey, Hash::make($code), $ttl);
 
-        $this->sendMail(
-            $email,
-            'Password Reset Code — El Tarek',
-            "Your password reset code is: {$code}\n\nThis code expires in 10 minutes."
-        );
+        $this->sendOtpEmail($email, $code);
 
-        return $this->ok(null, 'If an account exists for that email, a reset code has been sent.');
+        return $this->ok(null, 'A reset code has been sent to your email.');
     }
 
     /** Step 2 — verify code and set new password (public). */
@@ -357,22 +354,16 @@ class AuthController extends ApiController
 
         Cache::put($cacheKey, Hash::make($code), $ttl);
 
-        $this->sendMail(
-            $email,
-            'Verify Your Email — El Tarek',
-            "Your email verification code is: {$code}\n\nThis code expires in 15 minutes."
-        );
+        $this->sendOtpEmail($email, $code);
 
         return $code;
     }
 
 
-    private function sendMail(string $to, string $subject, string $body): void
+    private function sendOtpEmail(string $to, string $code): void
     {
         try {
-            Mail::raw($body, static function ($message) use ($to, $subject): void {
-                $message->to($to)->subject($subject);
-            });
+            Mail::to($to)->send(new \App\Mail\OtpMail($code));
         } catch (\Throwable $e) {
             // Log but do not bubble up — mail failure shouldn't block the API.
             logger()->error('Mail send failed', ['to' => $to, 'error' => $e->getMessage()]);
