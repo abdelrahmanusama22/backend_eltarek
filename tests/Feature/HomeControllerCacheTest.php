@@ -62,7 +62,7 @@ class HomeControllerCacheTest extends TestCase
         // 1. First request should populate cache
         $firstResponse = $this->getJson('/api/v1/home');
         $firstResponse->assertOk()
-            ->assertHeader('Cache-Control', 'max-age=120, public')
+            ->assertHeader('Cache-Control', 'no-store, private')
             ->assertJsonPath('data.heroes.0.id', $vehicle->id)
             ->assertJsonPath('data.brands.0.id', $brand->id);
 

@@ -17,7 +17,7 @@ class VehicleController extends ApiController
             'sort' => ['nullable', 'in:price_asc,price_desc,newest'],
         ]);
 
-        $query = Vehicle::with(['brand', 'trims'])->where('active', true);
+        $query = Vehicle::with(['brand', 'trims'])->published();
 
         if ($brandId = $request->integer('brand_id')) {
             $query->where('brand_id', $brandId);
@@ -59,17 +59,20 @@ class VehicleController extends ApiController
     {
         $request->validate(['q' => ['required', 'string', 'min:1', 'max:80']]);
         $q = $request->string('q')->toString();
-        $escapedQ = str_replace(['\\', '%', '_'], ['\\\\', '\\%', '\\_'], $q);
+        $terms = $this->vehicleSearchTerms($q);
 
         $vehicles = Vehicle::with(['brand', 'trims'])
-            ->where('active', true)
-            ->where(function ($query) use ($escapedQ) {
-                $query->where('model', 'like', "%{$escapedQ}%")
-                    ->orWhere('model_ar', 'like', "%{$escapedQ}%")
-                    ->orWhere('year', 'like', "%{$escapedQ}%")
-                    ->orWhereHas('brand', fn ($b) => $b
-                        ->where('name', 'like', "%{$escapedQ}%")
-                        ->orWhere('name_ar', 'like', "%{$escapedQ}%"));
+            ->published()
+            ->where(function ($query) use ($terms) {
+                foreach ($terms as $term) {
+                    $escaped = str_replace(['\\', '%', '_'], ['\\\\', '\\%', '\\_'], $term);
+                    $query->orWhere('model', 'like', "%{$escaped}%")
+                        ->orWhere('model_ar', 'like', "%{$escaped}%")
+                        ->orWhere('year', 'like', "%{$escaped}%")
+                        ->orWhereHas('brand', fn ($brand) => $brand
+                            ->where('name', 'like', "%{$escaped}%")
+                            ->orWhere('name_ar', 'like', "%{$escaped}%"));
+                }
             })
             ->limit(30)
             ->get();
@@ -80,10 +83,49 @@ class VehicleController extends ApiController
         );
     }
 
+    /** @return list<string> */
+    private function vehicleSearchTerms(string $query): array
+    {
+        $aliases = [
+            'مرسيدس' => 'mercedes', 'بي ام دبليو' => 'bmw',
+            'اودي' => 'audi', 'تويوتا' => 'toyota', 'كيا' => 'kia',
+            'هيونداي' => 'hyundai', 'بورشه' => 'porsche', 'تسلا' => 'tesla',
+            'نيسان' => 'nissan', 'شيفروليه' => 'chevrolet', 'شيري' => 'chery',
+            'بي واي دي' => 'byd', 'شانجان' => 'changan', 'رينو' => 'renault',
+            'بيجو' => 'peugeot', 'فولكس فاجن' => 'volkswagen', 'سيات' => 'seat',
+            'سكودا' => 'skoda', 'سوزوكي' => 'suzuki', 'ميتسوبيشي' => 'mitsubishi',
+            'اوبل' => 'opel', 'فيات' => 'fiat', 'فورد' => 'ford', 'جيب' => 'jeep',
+            'لاند روفر' => 'land rover', 'رينج روفر' => 'range rover',
+            'ام جي' => 'mg', 'جي اي سي' => 'gac', 'هافال' => 'haval',
+            'جيتور' => 'jetour', 'سيتروين' => 'citroen', 'كوبرا' => 'cupra',
+            'ديبال' => 'deepal',
+        ];
+
+        $normalized = $this->normalizeArabicSearch($query);
+        $terms = [$query, $normalized];
+        foreach ($aliases as $alias => $english) {
+            $normalizedAlias = $this->normalizeArabicSearch($alias);
+            if (str_contains($normalizedAlias, $normalized) || str_contains($normalized, $normalizedAlias)) {
+                $terms[] = $english;
+            }
+        }
+
+        return array_values(array_unique(array_filter($terms)));
+    }
+
+    private function normalizeArabicSearch(string $value): string
+    {
+        $value = mb_strtolower(trim($value));
+        $value = preg_replace('/[\x{064B}-\x{065F}\x{0670}\x{0640}]/u', '', $value) ?? $value;
+        $value = str_replace(['آ', 'أ', 'إ', 'ى', 'ة'], ['ا', 'ا', 'ا', 'ي', 'ه'], $value);
+
+        return preg_replace('/\s+/u', ' ', $value) ?? $value;
+    }
+
     /** GET /vehicles/{vehicle}/trims */
     public function trims(Vehicle $vehicle): JsonResponse
     {
-        abort_unless($vehicle->active, 404);
+        abort_unless(Vehicle::published()->whereKey($vehicle->id)->exists(), 404);
 
         return $this->ok([
             'vehicle_id' => $vehicle->id,
@@ -99,12 +141,12 @@ class VehicleController extends ApiController
     /** GET /trims/{trim} */
     public function trimDetail(Request $request, Trim $trim): JsonResponse
     {
-        abort_unless($trim->active && $trim->vehicle?->active, 404);
+        abort_unless(Trim::published()->whereKey($trim->id)->exists(), 404);
 
         $user = $request->user('sanctum');
         $vehicle = $trim->vehicle;
         $rival = $trim->suggested_comparison_trim_id
-            ? Trim::with('vehicle')->find($trim->suggested_comparison_trim_id)
+            ? Trim::with('vehicle')->published()->find($trim->suggested_comparison_trim_id)
             : null;
 
         // "BMW X5 M50i" + trim "M50i" => keep "BMW X5 M50i", not "BMW X5 M50i M50i".
@@ -128,7 +170,7 @@ class VehicleController extends ApiController
     /** POST /trims/{trim}/favorite */
     public function toggleFavorite(Request $request, Trim $trim): JsonResponse
     {
-        abort_unless($trim->active && $trim->vehicle?->active, 404);
+        abort_unless(Trim::published()->whereKey($trim->id)->exists(), 404);
 
         $user = $request->user();
         $isFavorited = $user->favorites()->whereKey($trim->id)->exists();
@@ -143,7 +185,7 @@ class VehicleController extends ApiController
     /** GET /vehicles/{vehicle} */
     public function show($id): JsonResponse
     {
-        $vehicle = Vehicle::with(['brand', 'trims'])->where('active', true)->findOrFail($id);
+        $vehicle = Vehicle::with(['brand', 'trims'])->published()->findOrFail($id);
 
         return $this->ok($this->vehicleListItem($vehicle));
     }

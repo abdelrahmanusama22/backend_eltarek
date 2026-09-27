@@ -90,4 +90,30 @@ class BranchSearchSqlFilterTest extends TestCase
             ->assertOk()
             ->assertJsonCount(0, 'data');
     }
+
+    public function test_branch_results_are_bounded_and_have_a_next_cursor(): void
+    {
+        $city = City::create(['name' => 'Cairo', 'name_ar' => 'القاهرة', 'sort' => 1]);
+        foreach (range(1, 4) as $index) {
+            Branch::create([
+                'city_id' => $city->id, 'name' => "Branch {$index}", 'name_ar' => "فرع {$index}",
+                'address' => 'Address', 'address_ar' => 'عنوان', 'phone' => '19001',
+                'hours' => '9 AM - 10 PM', 'hours_ar' => '9 ص - 10 م',
+                'lat' => 30.0 + $index / 100, 'lng' => 31.0, 'active' => true,
+            ]);
+        }
+
+        $first = $this->getJson('/api/v1/branches?limit=2')->assertOk()->assertJsonCount(2, 'data');
+        $cursor = $first->json('meta.next_cursor');
+        $this->assertNotNull($cursor);
+        $second = $this->getJson('/api/v1/branches?limit=2&cursor='.urlencode($cursor))
+            ->assertOk()->assertJsonCount(2, 'data');
+        $this->assertNotSame($first->json('data.0.id'), $second->json('data.0.id'));
+
+        $nearby = $this->getJson('/api/v1/branches?lat=30.0&lng=31.0&limit=2')
+            ->assertOk()->assertJsonCount(2, 'data');
+        $this->assertLessThanOrEqual(
+            $nearby->json('data.1.distance_km'), $nearby->json('data.0.distance_km'),
+        );
+    }
 }

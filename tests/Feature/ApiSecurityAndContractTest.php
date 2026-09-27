@@ -47,6 +47,44 @@ class ApiSecurityAndContractTest extends TestCase
             ->assertJsonStructure(['data', 'meta' => ['catalog_version', 'next_cursor', 'has_more']]);
     }
 
+    public function test_public_catalog_hides_vehicles_when_their_brand_is_unpublished(): void
+    {
+        [$trim] = $this->catalogRecords();
+        $brandId = $trim->vehicle->brand_id;
+        \App\Models\Brand::whereKey($brandId)->update(['active' => false]);
+
+        $this->getJson("/api/v1/brands/{$brandId}")->assertNotFound();
+        $this->getJson("/api/v1/vehicles/{$trim->vehicle_id}")->assertNotFound();
+        $this->getJson("/api/v1/vehicles/{$trim->vehicle_id}/trims")->assertNotFound();
+        $this->getJson("/api/v1/trims/{$trim->id}")->assertNotFound();
+        $this->getJson('/api/v1/catalog/vehicles')->assertOk()->assertJsonCount(0, 'data');
+        $this->getJson('/api/v1/catalog/trims')->assertOk()->assertJsonCount(0, 'data');
+        $this->getJson('/api/v1/vehicles')->assertOk()->assertJsonCount(0, 'data');
+    }
+
+    public function test_home_respects_explicitly_empty_dashboard_sections(): void
+    {
+        $this->catalogRecords();
+        AppSetting::put('home_hero_vehicle_ids', []);
+        AppSetting::put('smart_matches', []);
+        AppSetting::put('budget_pick_trim_ids', []);
+
+        $this->getJson('/api/v1/home')->assertOk()
+            ->assertJsonCount(0, 'data.heroes')
+            ->assertJsonCount(0, 'data.smart_matches')
+            ->assertJsonCount(0, 'data.budget_picks');
+    }
+
+    public function test_home_refreshes_after_catalog_item_is_deactivated_without_saving_settings(): void
+    {
+        [$trim] = $this->catalogRecords();
+        AppSetting::put('home_hero_vehicle_ids', [$trim->vehicle_id]);
+        $this->getJson('/api/v1/home')->assertOk()->assertJsonCount(1, 'data.heroes');
+
+        $trim->vehicle->update(['active' => false]);
+        $this->getJson('/api/v1/home')->assertOk()->assertJsonCount(0, 'data.heroes');
+    }
+
     public function test_verify_otp_idempotency_replays_the_original_success(): void
     {
         OtpCode::create([
@@ -358,9 +396,37 @@ class ApiSecurityAndContractTest extends TestCase
         $user = User::factory()->create(['is_active' => true]);
         Sanctum::actingAs($user);
         $this->postJson("/api/v1/trims/{$trim->id}/favorite")->assertOk()->assertJsonPath('data.is_favorited', true);
-        $this->getJson('/api/v1/profile/favorites')->assertOk()->assertJsonCount(1, 'data');
+        $this->getJson('/api/v1/profile/favorites')->assertOk()->assertJsonCount(1, 'data.items');
         $trim->update(['active' => false]);
-        $this->getJson('/api/v1/profile/favorites')->assertOk()->assertJsonCount(0, 'data');
+        $this->getJson('/api/v1/profile/favorites')->assertOk()->assertJsonCount(0, 'data.items');
+    }
+
+    public function test_favorites_cursor_exposes_later_pages(): void
+    {
+        [$firstTrim] = $this->catalogRecords();
+        $user = User::factory()->create();
+        Sanctum::actingAs($user);
+        $trimIds = [$firstTrim->id];
+        foreach (range(2, 4) as $index) {
+            $trimIds[] = Trim::create([
+                'vehicle_id' => $firstTrim->vehicle_id,
+                'name' => "Trim {$index}", 'name_ar' => 'فئة',
+                'price_egp' => 100, 'active' => true,
+                'highlights' => [], 'specs' => [], 'metrics' => [], 'gallery' => [],
+            ])->id;
+        }
+        foreach ($trimIds as $id) {
+            $user->favorites()->attach($id);
+        }
+
+        $first = $this->getJson('/api/v1/profile/favorites?limit=2')->assertOk()->assertJsonCount(2, 'data.items');
+        $second = $this->getJson('/api/v1/profile/favorites?limit=2&cursor='.urlencode($first->json('data.next_cursor')))
+            ->assertOk()->assertJsonCount(2, 'data.items');
+        $this->assertNull($second->json('data.next_cursor'));
+        $this->assertEqualsCanonicalizing($trimIds, array_merge(
+            array_column($first->json('data.items'), 'trim_id'),
+            array_column($second->json('data.items'), 'trim_id'),
+        ));
     }
 
     public function test_reward_redemption_creates_recoverable_code_and_enforces_limits(): void
