@@ -2,10 +2,9 @@
 
 namespace Tests\Feature;
 
+use App\Services\GoogleIdentityTokenVerifier;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
-use App\Models\User;
-use Google\Client as GoogleClient;
 use Mockery;
 
 class GoogleAuthTest extends TestCase
@@ -22,15 +21,15 @@ class GoogleAuthTest extends TestCase
             "picture" => "https://example.com/photo.jpg",
         ];
 
-        $mock = Mockery::mock(GoogleClient::class);
-        $mock->shouldReceive("verifyIdToken")
+        config(['services.google.web_client_id' => 'test-google-client']);
+
+        $mock = Mockery::mock(GoogleIdentityTokenVerifier::class);
+        $mock->shouldReceive('verify')
              ->once()
-             ->with("dummy_id_token")
+             ->with('dummy_id_token', 'test-google-client')
              ->andReturn($mockPayload);
 
-        $this->app->bind(GoogleClient::class, function() use ($mock) {
-            return $mock;
-        });
+        $this->app->instance(GoogleIdentityTokenVerifier::class, $mock);
 
         $response = $this->postJson("/api/v1/auth/google", [
             "id_token" => "dummy_id_token",

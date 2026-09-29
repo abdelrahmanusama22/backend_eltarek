@@ -135,16 +135,8 @@
             <div class="flex items-center gap-3 w-full sm:w-auto">
                 <div class="relative w-full sm:w-64">
                     <span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-text-secondary text-sm">search</span>
-                    <input class="w-full bg-surface-container-high border border-border-subtle rounded text-sm pl-9 pr-3 py-1.5 text-on-surface focus:border-primary focus:ring-1 focus:ring-primary/20 outline-none transition-all placeholder:text-text-secondary" placeholder="Search brands..." type="text"/>
+                    <input wire:model.live.debounce.300ms="search" class="w-full bg-surface-container-high border border-border-subtle rounded text-sm pl-9 pr-3 py-1.5 text-on-surface focus:border-primary focus:ring-1 focus:ring-primary/20 outline-none transition-all placeholder:text-text-secondary" placeholder="Search brands..." type="search"/>
                 </div>
-            </div>
-            <div class="flex items-center gap-2 w-full sm:w-auto justify-end">
-                <button class="bg-transparent border border-border-subtle text-text-secondary hover:text-on-surface hover:bg-surface-container-high px-3 py-1.5 rounded text-sm font-medium transition-colors flex items-center gap-1.5">
-                    <span class="material-symbols-outlined text-sm">filter_list</span> Filter
-                </button>
-                <button class="bg-transparent border border-border-subtle text-text-secondary hover:text-on-surface hover:bg-surface-container-high px-3 py-1.5 rounded text-sm font-medium transition-colors flex items-center gap-1.5">
-                    <span class="material-symbols-outlined text-sm">download</span> Export
-                </button>
             </div>
         </div>
 
@@ -161,7 +153,10 @@
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-border-subtle bg-surface-container-low">
-                    @forelse($this->brands as $brand)
+                    @php
+                        $brands = $this->brands;
+                    @endphp
+                    @forelse($brands as $brand)
                     <tr class="hover:bg-surface-container-high/50 transition-colors group {{ empty($brand->name_ar) ? 'bg-error/5' : '' }}">
                         <td class="py-3 px-4">
                             <div class="w-10 h-10 rounded-full bg-surface-container-high border border-border-subtle flex items-center justify-center overflow-hidden p-2 {{ $brand->resolved_logo_url ? 'bg-white' : '' }}">
@@ -197,7 +192,7 @@
                             @endif
                         </td>
                         <td class="py-3 px-4">
-                            <span class="text-text-secondary text-sm">{{ $brand->vehicles()->count() }} Models</span>
+                            <span class="text-text-secondary text-sm">{{ $brand->vehicles_count }} Models</span>
                         </td>
                         <td class="py-3 px-4 text-right">
                             <div class="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -209,9 +204,6 @@
                                 <a href="/admin/brands/{{ $brand->id }}/edit" class="p-1.5 text-text-secondary hover:text-on-surface rounded hover:bg-surface-container transition-colors" title="Edit">
                                     <span class="material-symbols-outlined text-[18px]">edit</span>
                                 </a>
-                                <button class="p-1.5 text-text-secondary hover:text-error rounded hover:bg-error/10 transition-colors" title="Delete">
-                                    <span class="material-symbols-outlined text-[18px]">delete</span>
-                                </button>
                             </div>
                         </td>
                     </tr>
@@ -227,18 +219,10 @@
             </table>
         </div>
 
-        <!-- Pagination -->
+        <!-- Livewire pagination -->
         <div class="p-4 border-t border-border-subtle flex items-center justify-between text-sm">
-            <span class="text-text-secondary">Showing <span class="text-on-surface font-medium">1</span> to <span class="text-on-surface font-medium">{{ count($this->brands) }}</span> of <span class="text-on-surface font-medium">{{ count($this->brands) }}</span> brands</span>
-            <div class="flex items-center gap-1">
-                <button class="px-2 py-1 text-text-secondary hover:text-on-surface disabled:opacity-50 disabled:cursor-not-allowed" disabled="">
-                    <span class="material-symbols-outlined text-sm">chevron_left</span>
-                </button>
-                <button class="w-7 h-7 rounded flex items-center justify-center bg-surface-container-high text-on-surface border border-border-subtle font-medium">1</button>
-                <button class="px-2 py-1 text-text-secondary hover:text-on-surface disabled:opacity-50 disabled:cursor-not-allowed" disabled="">
-                    <span class="material-symbols-outlined text-sm">chevron_right</span>
-                </button>
-            </div>
+            <span class="text-text-secondary">Showing {{ $brands->firstItem() ?? 0 }} to {{ $brands->lastItem() ?? 0 }} of {{ $brands->total() }} brands</span>
+            {{ $brands->links(data: ['scrollTo' => false]) }}
         </div>
     </div>
 </div>

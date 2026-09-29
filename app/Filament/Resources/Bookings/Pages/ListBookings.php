@@ -6,18 +6,28 @@ use App\Filament\Resources\Bookings\BookingResource;
 use App\Models\Booking;
 use Filament\Resources\Pages\Page;
 use Illuminate\Contracts\Support\Htmlable;
+use Illuminate\Database\Eloquent\Builder;
+use Livewire\WithPagination;
 
 class ListBookings extends Page
 {
+    use WithPagination;
+
     protected static string $resource = BookingResource::class;
 
     protected string $view = 'filament.pages.custom-list-bookings';
 
     public $activeTab = 'all';
+    public string $search = '';
 
-    public function getBookingsProperty()
+    public function updatedSearch(): void
     {
-        $query = Booking::query()->latest();
+        $this->resetPage();
+    }
+
+    public function bookingsQuery(): Builder
+    {
+        $query = Booking::query()->with(['user', 'trim', 'branch'])->latest();
 
         if ($this->activeTab === 'pending') {
             $query->where('status', 'pending');
@@ -27,12 +37,29 @@ class ListBookings extends Page
             $query->where('status', 'completed');
         }
 
-        return $query->get();
+        if (trim($this->search) !== '') {
+            $term = '%'.str_replace(['\\', '%', '_'], ['\\\\', '\\%', '\\_'], trim($this->search)).'%';
+            $query->where(function (Builder $q) use ($term): void {
+                $q->where('reference', 'like', $term)
+                    ->orWhereHas('user', fn (Builder $u) => $u->where('name', 'like', $term)->orWhere('phone', 'like', $term))
+                    ->orWhereHas('trim', fn (Builder $t) => $t->where('name', 'like', $term));
+            });
+        }
+
+        return $query;
     }
 
-    public function setTab($tab)
+    public function getBookingsProperty()
     {
-        $this->activeTab = $tab;
+        return $this->bookingsQuery()->paginate(20);
+    }
+
+    public function setTab(string $tab): void
+    {
+        if (in_array($tab, ['all', 'pending', 'confirmed', 'completed'], true)) {
+            $this->activeTab = $tab;
+            $this->resetPage();
+        }
     }
 
     public function getTitle(): string|Htmlable

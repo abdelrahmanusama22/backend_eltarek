@@ -49,8 +49,7 @@ class CompareController extends ApiController
         }
 
         $trims = Trim::with('vehicle')
-            ->where('active', true)
-            ->whereHas('vehicle', fn ($query) => $query->where('active', true))
+            ->published()
             ->findMany($ids)
             ->sortBy(fn (Trim $t) => $ids->search($t->id))
             ->values();
@@ -119,6 +118,9 @@ class CompareController extends ApiController
     public function add(Request $request): JsonResponse
     {
         $request->validate(['trim_id' => ['required', 'integer', Rule::exists('trims', 'id')->where(fn ($query) => $query->where('active', true)->whereNull('deleted_at'))]]);
+        if (! Trim::published()->whereKey($request->integer('trim_id'))->exists()) {
+            return $this->fail('Trim is not available.', 422);
+        }
         $list = $this->currentList($request);
         $max = (int) AppSetting::get('compare_max', 3);
 

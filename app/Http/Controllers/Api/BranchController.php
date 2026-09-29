@@ -15,6 +15,7 @@ class BranchController extends ApiController
             'lng' => ['nullable', 'numeric', 'between:-180,180'],
             'city_id' => ['nullable', 'integer', 'exists:cities,id'],
             'q' => ['nullable', 'string', 'max:100'],
+            'limit' => ['nullable', 'integer', 'min:1', 'max:100'],
         ]);
         $lat = $request->filled('lat') ? (float) $request->input('lat') : null;
         $lng = $request->filled('lng') ? (float) $request->input('lng') : null;
@@ -35,13 +36,21 @@ class BranchController extends ApiController
             });
         }
 
-        $branches = $query->get();
-
         if ($lat !== null && $lng !== null) {
-            $branches = $branches->sortBy(fn (Branch $b) => $b->distanceKm($lat, $lng))->values();
+            // Planar distance is sufficient to order nearby branches; the
+            // precise Haversine distance is still returned by toApi().
+            $longitudeWeight = cos(deg2rad($lat)) ** 2;
+            $query->select('branches.*')->selectRaw(
+                '((lat - ?) * (lat - ?) + (lng - ?) * (lng - ?) * ?) as distance_sort',
+                [$lat, $lat, $lng, $lng, $longitudeWeight],
+            )->orderBy('distance_sort');
         }
+        $page = $query->orderBy('id')->cursorPaginate(min(100, max(1, $request->integer('limit', 50))));
 
-        return $this->ok($branches->map(fn (Branch $b) => $b->toApi($lat, $lng)));
+        return $this->ok(collect($page->items())->map(fn (Branch $b) => $b->toApi($lat, $lng)), meta: [
+            'next_cursor' => $page->nextCursor()?->encode(),
+            'has_more' => $page->hasMorePages(),
+        ]);
     }
 
     public function show(Branch $branch): JsonResponse
